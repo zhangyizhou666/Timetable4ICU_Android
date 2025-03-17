@@ -93,9 +93,9 @@ fun TimetableScreen(
         viewModel.showTimeDetails = true
         
         // Load CSV data
-        val csvData = CSVLoader.loadCSVFromAssets(context, "courses_data.csv")
-        // Filter courses for 2024 Spring term
-        viewModel.loadCoursesFromCSV("2024", "Spring", csvData)
+        val csvData = CSVLoader.loadCSVFromAssets(context, "courses_2025_all_terms.csv")
+        // Filter courses for the selected year and term (default: 2025 Spring)
+        viewModel.loadCoursesFromCSV("2025", "Spring", csvData)
         
         // Load timetable data if we have a saved ID
         if (viewModel.currentTimetableId.isNotEmpty()) {
@@ -199,24 +199,26 @@ fun TimetableScreen(
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                    Text(
+                        text = "Timetables",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Button(
+                        onClick = { 
+                            newTimetableTitle = ""
+                            selectedYear = "2025"  // Set default year to 2025
+                            selectedTerm = "Spring"
+                            showCreateDialog = true 
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "Timetables",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        
-                        // Add new timetable button
-                        IconButton(onClick = { showCreateDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Timetable"
-                            )
-                        }
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Create New Timetable")
                     }
                     
                     Spacer(modifier = Modifier.height(8.dp))
@@ -231,15 +233,28 @@ fun TimetableScreen(
                                     .fillMaxWidth()
                                     .clickable {
                                         viewModel.loadTimetableData(timetable.id)
-                                        scope.launch { drawerState.close() }
+                                        
+                                        // Load courses for this timetable's year and term
+                                        val csvData = CSVLoader.loadCSVFromAssets(context, "courses_2025_all_terms.csv")
+                                        viewModel.loadCoursesFromCSV(timetable.year, timetable.term, csvData)
+                                        
+                                        // Close the drawer
+                                        scope.launch {
+                                            drawerState.close()
+                                        }
                                     }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 12.dp, horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(
                                     selected = viewModel.currentTimetableId == timetable.id,
                                     onClick = {
                                         viewModel.loadTimetableData(timetable.id)
+                                        
+                                        // Load courses for this timetable's year and term
+                                        val csvData = CSVLoader.loadCSVFromAssets(context, "courses_2025_all_terms.csv")
+                                        viewModel.loadCoursesFromCSV(timetable.year, timetable.term, csvData)
+                                        
                                         scope.launch { drawerState.close() }
                                     }
                                 )
@@ -251,7 +266,6 @@ fun TimetableScreen(
                                         FontWeight.Bold else FontWeight.Normal
                                 )
                                 
-                                // Only show delete if there's more than one timetable
                                 if (viewModel.timetables.size > 1) {
                                     IconButton(onClick = {
                                         timetableToDelete = timetable.id
@@ -270,18 +284,18 @@ fun TimetableScreen(
                                 text = "${timetable.term}, ${timetable.year}",
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(start = 40.dp, bottom = 8.dp),
+                                    .padding(horizontal = 56.dp, vertical = 4.dp),
                                 fontSize = 12.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             
-                            Divider()
+                            Divider(modifier = Modifier.padding(horizontal = 16.dp))
                         }
                     }
                 }
             }
         }
-    ) {
+    ) { innerPadding ->
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
@@ -548,60 +562,77 @@ fun TimetableScreen(
                         OutlinedTextField(
                             value = newTimetableTitle,
                             onValueChange = { newTimetableTitle = it },
-                            label = { Text("Timetable Name") },
+                            label = { Text("Timetable Title") },
                             modifier = Modifier.fillMaxWidth()
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        Text("Term")
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            for (term in listOf("Spring", "Autumn", "Winter")) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    RadioButton(
-                                        selected = selectedTerm == term,
-                                        onClick = { selectedTerm = term }
-                                    )
-                                    Text(term)
-                                }
-                            }
+                        Text("Year:", fontWeight = FontWeight.Bold)
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedYear == "2025",
+                                onClick = { selectedYear = "2025" }
+                            )
+                            Text("2025")
                         }
                         
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         
-                        Text("Year")
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            for (year in listOf("2024", "2023", "2022", "2021", "2020")) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    RadioButton(
-                                        selected = selectedYear == year,
-                                        onClick = { selectedYear = year }
-                                    )
-                                    Text(year)
-                                }
-                            }
+                        Text("Term:", fontWeight = FontWeight.Bold)
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTerm == "Winter",
+                                onClick = { selectedTerm = "Winter" }
+                            )
+                            Text("Winter")
+                        }
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTerm == "Spring",
+                                onClick = { selectedTerm = "Spring" }
+                            )
+                            Text("Spring")
+                        }
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTerm == "Summer",
+                                onClick = { selectedTerm = "Summer" }
+                            )
+                            Text("Summer")
+                        }
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTerm == "Autumn",
+                                onClick = { selectedTerm = "Autumn" }
+                            )
+                            Text("Autumn")
                         }
                     }
                 },
                 confirmButton = {
-                    TextButton(
+                    Button(
                         onClick = {
                             if (newTimetableTitle.isNotEmpty()) {
+                                // Create a new timetable
                                 viewModel.createNewTimetable(newTimetableTitle, selectedYear, selectedTerm)
-                                newTimetableTitle = ""
+                                
+                                // Load courses for the selected year and term
+                                val csvData = CSVLoader.loadCSVFromAssets(context, "courses_2025_all_terms.csv")
+                                viewModel.loadCoursesFromCSV(selectedYear, selectedTerm, csvData)
+                                
                                 showCreateDialog = false
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Please enter a title for the timetable",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                     ) {
@@ -609,9 +640,7 @@ fun TimetableScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(
-                        onClick = { showCreateDialog = false }
-                    ) {
+                    TextButton(onClick = { showCreateDialog = false }) {
                         Text("Cancel")
                     }
                 }
