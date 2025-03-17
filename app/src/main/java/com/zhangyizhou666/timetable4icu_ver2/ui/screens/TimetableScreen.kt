@@ -80,7 +80,7 @@ fun TimetableScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var newTimetableTitle by remember { mutableStateOf("") }
-    var selectedYear by remember { mutableStateOf("2024") }
+    var selectedYear by remember { mutableStateOf("2025") }
     var selectedTerm by remember { mutableStateOf("Spring") }
     var timetableToDelete by remember { mutableStateOf("") }
     
@@ -106,196 +106,24 @@ fun TimetableScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier.width(300.dp)
-            ) {
-                // Drawer header
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .background(DarkBlue),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Timetable Settings",
-                        color = Silver,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+            DrawerContent(
+                viewModel = viewModel,
+                drawerState = drawerState,
+                scope = scope,
+                context = context,
+                onCreateTimetable = {
+                    newTimetableTitle = ""
+                    selectedYear = "2025"
+                    selectedTerm = "Spring"
+                    showCreateDialog = true
+                },
+                onDeleteTimetable = { id ->
+                    timetableToDelete = id
+                    showDeleteConfirmDialog = true
                 }
-                
-                Divider()
-                
-                // Display options section
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Display Options",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Show Saturday option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Show Saturday",
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = viewModel.showSaturday,
-                            onCheckedChange = { viewModel.showSaturday = it }
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Show 8th period option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Show 8th Period",
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = viewModel.showEighthPeriod,
-                            onCheckedChange = { viewModel.showEighthPeriod = it }
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Show time details option
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Show Time Details",
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = viewModel.showTimeDetails,
-                            onCheckedChange = { viewModel.showTimeDetails = it }
-                        )
-                    }
-                }
-                
-                Divider()
-                
-                // Timetables section
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Timetables",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Button(
-                        onClick = { 
-                            newTimetableTitle = ""
-                            selectedYear = "2025"  // Set default year to 2025
-                            selectedTerm = "Spring"
-                            showCreateDialog = true 
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Create New Timetable")
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // List of timetables
-                    LazyColumn(
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        items(viewModel.timetables) { timetable ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        viewModel.loadTimetableData(timetable.id)
-                                        
-                                        // Load courses for this timetable's year and term
-                                        val csvData = CSVLoader.loadCSVFromAssets(context, "courses_2025_all_terms.csv")
-                                        viewModel.loadCoursesFromCSV(timetable.year, timetable.term, csvData)
-                                        
-                                        // Close the drawer
-                                        scope.launch {
-                                            drawerState.close()
-                                        }
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = viewModel.currentTimetableId == timetable.id,
-                                    onClick = {
-                                        viewModel.loadTimetableData(timetable.id)
-                                        
-                                        // Load courses for this timetable's year and term
-                                        val csvData = CSVLoader.loadCSVFromAssets(context, "courses_2025_all_terms.csv")
-                                        viewModel.loadCoursesFromCSV(timetable.year, timetable.term, csvData)
-                                        
-                                        scope.launch { drawerState.close() }
-                                    }
-                                )
-                                
-                                Text(
-                                    text = timetable.title,
-                                    modifier = Modifier.weight(1f),
-                                    fontWeight = if (viewModel.currentTimetableId == timetable.id) 
-                                        FontWeight.Bold else FontWeight.Normal
-                                )
-                                
-                                if (viewModel.timetables.size > 1) {
-                                    IconButton(onClick = {
-                                        timetableToDelete = timetable.id
-                                        showDeleteConfirmDialog = true
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete Timetable"
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            // Add term and year info
-                            Text(
-                                text = "${timetable.term}, ${timetable.year}",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 56.dp, vertical = 4.dp),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            
-                            Divider(modifier = Modifier.padding(horizontal = 16.dp))
-                        }
-                    }
-                }
-            }
+            )
         }
-    ) { innerPadding ->
+    ) {
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
@@ -339,285 +167,21 @@ fun TimetableScreen(
                 )
             }
         ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                // Day headers
-                val days = if (viewModel.showSaturday) {
-                    listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
-                } else {
-                    listOf("Mon", "Tue", "Wed", "Thu", "Fri")
-                }
+            Box(modifier = Modifier.padding(innerPadding)) {
+                // Main content
+                TimetableContent(navController, viewModel)
                 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(40.dp)
-                ) {
-                    // Time column spacer
-                    Spacer(modifier = Modifier.width(40.dp))
-                    
-                    // Day headers
-                    days.forEach { day ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = day,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-                
-                Divider(color = SeparatorColor)
-                
-                // Time slots and timetable grid
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    // Time column
-                    Column(
-                        modifier = Modifier
-                            .width(40.dp)
-                    ) {
-                        val periods = if (viewModel.showEighthPeriod) {
-                            listOf("1", "2", "3", "L", "4", "5", "6", "7", "8")
-                        } else {
-                            listOf("1", "2", "3", "L", "4", "5", "6", "7")
-                        }
-                        
-                        periods.forEach { period ->
-                            if (period == "L") {
-                                // Lunch period
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(30.dp)
-                                        .background(Color.Gray),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "L",
-                                        color = Color.White,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            } else {
-                                // Regular period
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        if (viewModel.showTimeDetails) {
-                                            val timeDetail = viewModel.timeDetailWithEighth[period]
-                                            Text(
-                                                text = timeDetail?.first ?: "",
-                                                fontSize = 10.sp,
-                                                color = Color.Gray
-                                            )
-                                        }
-                                        
-                                        Text(
-                                            text = period,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        
-                                        if (viewModel.showTimeDetails) {
-                                            val timeDetail = viewModel.timeDetailWithEighth[period]
-                                            Text(
-                                                text = timeDetail?.second ?: "",
-                                                fontSize = 10.sp,
-                                                color = Color.Gray
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            Divider(color = SeparatorColor)
-                        }
-                    }
-                    
-                    // Timetable grid
-                    val dayCount = if (viewModel.showSaturday) 6 else 5
-                    val periodCount = if (viewModel.showEighthPeriod) 9 else 8
-                    
-                    for (dayIndex in 0 until dayCount) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .border(0.5.dp, SeparatorColor)
-                        ) {
-                            for (periodIndex in 0 until periodCount) {
-                                val cellSize = viewModel.calculateCellSize(dayIndex, periodIndex)
-                                
-                                // Skip cells that are continuations of previous cells
-                                if (cellSize == 0f) continue
-                                
-                                if (periodIndex == 3) {
-                                    // Lunch period
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(30.dp)
-                                            .background(
-                                                if (viewModel.array[dayIndex][periodIndex].isNotEmpty()) {
-                                                    getColorFromName(viewModel.arrayColor[dayIndex][periodIndex])
-                                                } else {
-                                                    Color.Gray
-                                                }
-                                            )
-                                            .clickable {
-                                                // Navigate to lunch edit screen
-                                                navController.navigate("lunch/$dayIndex/$periodIndex")
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = viewModel.array[dayIndex][periodIndex],
-                                            color = Color.Black,
-                                            fontSize = 12.sp,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                } else {
-                                    // Regular period
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .weight(cellSize)
-                                            .background(getColorFromName(viewModel.arrayColor[dayIndex][periodIndex]))
-                                            .combinedClickable(
-                                                onClick = {
-                                                    // Navigate to cell edit screen
-                                                    navController.navigate("edit/$dayIndex/$periodIndex")
-                                                },
-                                                onLongClick = {
-                                                    // Only navigate to details if cell has content
-                                                    if (viewModel.array[dayIndex][periodIndex].isNotEmpty()) {
-                                                        navController.navigate("detail/$dayIndex/$periodIndex")
-                                                    }
-                                                }
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (viewModel.shouldShowCellContent(dayIndex, periodIndex)) {
-                                            Column(
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                modifier = Modifier.padding(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = viewModel.array[dayIndex][periodIndex],
-                                                    fontSize = 12.sp,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                                
-                                                if (viewModel.arrayRoom[dayIndex][periodIndex].isNotEmpty() && 
-                                                    viewModel.arrayRoom[dayIndex][periodIndex] != "NO DATA") {
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Text(
-                                                        text = viewModel.arrayRoom[dayIndex][periodIndex],
-                                                        fontSize = 10.sp,
-                                                        textAlign = TextAlign.Center
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                
-                                // Only show divider if needed
-                                if (viewModel.shouldShowDivider(dayIndex, periodIndex)) {
-                                    Divider(color = SeparatorColor)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Create new timetable dialog
-        if (showCreateDialog) {
-            AlertDialog(
-                onDismissRequest = { showCreateDialog = false },
-                title = { Text("Create New Timetable") },
-                text = {
-                    Column {
-                        OutlinedTextField(
-                            value = newTimetableTitle,
-                            onValueChange = { newTimetableTitle = it },
-                            label = { Text("Timetable Title") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Text("Year:", fontWeight = FontWeight.Bold)
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedYear == "2025",
-                                onClick = { selectedYear = "2025" }
-                            )
-                            Text("2025")
-                        }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Text("Term:", fontWeight = FontWeight.Bold)
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedTerm == "Winter",
-                                onClick = { selectedTerm = "Winter" }
-                            )
-                            Text("Winter")
-                        }
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedTerm == "Spring",
-                                onClick = { selectedTerm = "Spring" }
-                            )
-                            Text("Spring")
-                        }
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedTerm == "Summer",
-                                onClick = { selectedTerm = "Summer" }
-                            )
-                            Text("Summer")
-                        }
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedTerm == "Autumn",
-                                onClick = { selectedTerm = "Autumn" }
-                            )
-                            Text("Autumn")
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
+                // Dialogs
+                if (showCreateDialog) {
+                    CreateTimetableDialog(
+                        newTimetableTitle = newTimetableTitle,
+                        onTitleChange = { newTimetableTitle = it },
+                        selectedYear = selectedYear,
+                        onYearChange = { selectedYear = it },
+                        selectedTerm = selectedTerm,
+                        onTermChange = { selectedTerm = it },
+                        onDismiss = { showCreateDialog = false },
+                        onConfirm = {
                             if (newTimetableTitle.isNotEmpty()) {
                                 // Create a new timetable
                                 viewModel.createNewTimetable(newTimetableTitle, selectedYear, selectedTerm)
@@ -635,42 +199,533 @@ fun TimetableScreen(
                                 ).show()
                             }
                         }
-                    ) {
-                        Text("Create")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showCreateDialog = false }) {
-                        Text("Cancel")
-                    }
+                    )
                 }
-            )
-        }
-        
-        // Delete confirmation dialog
-        if (showDeleteConfirmDialog) {
-            AlertDialog(
-                onDismissRequest = { showDeleteConfirmDialog = false },
-                title = { Text("Delete Timetable") },
-                text = { Text("Are you sure you want to delete this timetable? This action cannot be undone.") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
+                
+                if (showDeleteConfirmDialog) {
+                    DeleteTimetableDialog(
+                        onDismiss = { showDeleteConfirmDialog = false },
+                        onConfirm = {
                             viewModel.deleteTimetable(timetableToDelete)
                             showDeleteConfirmDialog = false
                         }
-                    ) {
-                        Text("Delete")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showDeleteConfirmDialog = false }
-                    ) {
-                        Text("Cancel")
-                    }
+                    )
                 }
-            )
+            }
         }
     }
+}
+
+@Composable
+private fun TimetableContent(
+    navController: NavController,
+    viewModel: TimetableViewModel
+) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Day headers
+        val days = if (viewModel.showSaturday) {
+            listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+        } else {
+            listOf("Mon", "Tue", "Wed", "Thu", "Fri")
+        }
+        
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+        ) {
+            // Time column spacer
+            Spacer(modifier = Modifier.width(40.dp))
+            
+            // Day headers
+            days.forEach { day ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = day,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        
+        Divider(color = SeparatorColor)
+        
+        // Time slots and timetable grid
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            // Time column
+            Column(
+                modifier = Modifier.width(40.dp)
+            ) {
+                val periods = if (viewModel.showEighthPeriod) {
+                    listOf("1", "2", "3", "L", "4", "5", "6", "7", "8")
+                } else {
+                    listOf("1", "2", "3", "L", "4", "5", "6", "7")
+                }
+                
+                periods.forEach { period ->
+                    if (period == "L") {
+                        // Lunch period
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(30.dp)
+                                .background(Color.Gray),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "L",
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+                        }
+                    } else {
+                        // Regular period
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (viewModel.showTimeDetails) {
+                                    val timeDetail = viewModel.timeDetailWithEighth[period]
+                                    Text(
+                                        text = timeDetail?.first ?: "",
+                                        fontSize = 10.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+                                
+                                Text(
+                                    text = period,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                
+                                if (viewModel.showTimeDetails) {
+                                    val timeDetail = viewModel.timeDetailWithEighth[period]
+                                    Text(
+                                        text = timeDetail?.second ?: "",
+                                        fontSize = 10.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    Divider(color = SeparatorColor)
+                }
+            }
+            
+            // Timetable grid
+            val dayCount = if (viewModel.showSaturday) 6 else 5
+            val periodCount = if (viewModel.showEighthPeriod) 9 else 8
+            
+            for (dayIndex in 0 until dayCount) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .border(0.5.dp, SeparatorColor)
+                ) {
+                    for (periodIndex in 0 until periodCount) {
+                        val cellSize = viewModel.calculateCellSize(dayIndex, periodIndex)
+                        
+                        // Skip cells that are continuations of previous cells
+                        if (cellSize == 0f) continue
+                        
+                        if (periodIndex == 3) {
+                            // Lunch period
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(30.dp)
+                                    .background(
+                                        if (viewModel.array[dayIndex][periodIndex].isNotEmpty()) {
+                                            getColorFromName(viewModel.arrayColor[dayIndex][periodIndex])
+                                        } else {
+                                            Color.Gray
+                                        }
+                                    )
+                                    .clickable {
+                                        // Navigate to lunch edit screen
+                                        navController.navigate("lunch/$dayIndex/$periodIndex")
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = viewModel.array[dayIndex][periodIndex],
+                                    color = Color.Black,
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        } else {
+                            // Regular period
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(cellSize)
+                                    .background(getColorFromName(viewModel.arrayColor[dayIndex][periodIndex]))
+                                    .combinedClickable(
+                                        onClick = {
+                                            // Navigate to cell edit screen
+                                            navController.navigate("edit/$dayIndex/$periodIndex")
+                                        },
+                                        onLongClick = {
+                                            // Only navigate to details if cell has content
+                                            if (viewModel.array[dayIndex][periodIndex].isNotEmpty()) {
+                                                navController.navigate("detail/$dayIndex/$periodIndex")
+                                            }
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (viewModel.shouldShowCellContent(dayIndex, periodIndex)) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(4.dp)
+                                    ) {
+                                        Text(
+                                            text = viewModel.array[dayIndex][periodIndex],
+                                            fontSize = 12.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        
+                                        if (viewModel.arrayRoom[dayIndex][periodIndex].isNotEmpty() && 
+                                            viewModel.arrayRoom[dayIndex][periodIndex] != "NO DATA") {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = viewModel.arrayRoom[dayIndex][periodIndex],
+                                                fontSize = 10.sp,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Only show divider if needed
+                        if (viewModel.shouldShowDivider(dayIndex, periodIndex)) {
+                            Divider(color = SeparatorColor)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DrawerContent(
+    viewModel: TimetableViewModel,
+    drawerState: androidx.compose.material3.DrawerState,
+    scope: kotlinx.coroutines.CoroutineScope,
+    context: android.content.Context,
+    onCreateTimetable: () -> Unit,
+    onDeleteTimetable: (String) -> Unit
+) {
+    ModalDrawerSheet(
+        modifier = Modifier.width(300.dp)
+    ) {
+        // Drawer header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(DarkBlue),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Timetable Settings",
+                color = Silver,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        
+        Divider()
+        
+        // Display options section
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Display Options",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Show Saturday option
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Show Saturday",
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = viewModel.showSaturday,
+                    onCheckedChange = { viewModel.showSaturday = it }
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Show 8th period option
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Show 8th Period",
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = viewModel.showEighthPeriod,
+                    onCheckedChange = { viewModel.showEighthPeriod = it }
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Show time details option
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Show Time Details",
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = viewModel.showTimeDetails,
+                    onCheckedChange = { viewModel.showTimeDetails = it }
+                )
+            }
+        }
+        
+        Divider()
+        
+        // Timetables section
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Timetables",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Button(
+                onClick = onCreateTimetable,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Create New Timetable")
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // List of timetables
+            LazyColumn(
+                modifier = Modifier.weight(1f)
+            ) {
+                items(viewModel.timetables) { timetable ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.loadTimetableData(timetable.id)
+                                
+                                // Load courses for this timetable's year and term
+                                val csvData = CSVLoader.loadCSVFromAssets(context, "courses_2025_all_terms.csv")
+                                viewModel.loadCoursesFromCSV(timetable.year, timetable.term, csvData)
+                                
+                                // Close the drawer
+                                scope.launch {
+                                    drawerState.close()
+                                }
+                            }
+                            .padding(vertical = 12.dp, horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = viewModel.currentTimetableId == timetable.id,
+                            onClick = {
+                                viewModel.loadTimetableData(timetable.id)
+                                
+                                // Load courses for this timetable's year and term
+                                val csvData = CSVLoader.loadCSVFromAssets(context, "courses_2025_all_terms.csv")
+                                viewModel.loadCoursesFromCSV(timetable.year, timetable.term, csvData)
+                                
+                                scope.launch { drawerState.close() }
+                            }
+                        )
+                        
+                        Text(
+                            text = timetable.title,
+                            modifier = Modifier.weight(1f),
+                            fontWeight = if (viewModel.currentTimetableId == timetable.id) 
+                                FontWeight.Bold else FontWeight.Normal
+                        )
+                        
+                        if (viewModel.timetables.size > 1) {
+                            IconButton(onClick = { onDeleteTimetable(timetable.id) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete Timetable"
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Add term and year info
+                    Text(
+                        text = "${timetable.term}, ${timetable.year}",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 56.dp, vertical = 4.dp),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateTimetableDialog(
+    newTimetableTitle: String,
+    onTitleChange: (String) -> Unit,
+    selectedYear: String,
+    onYearChange: (String) -> Unit,
+    selectedTerm: String,
+    onTermChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create New Timetable") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = newTimetableTitle,
+                    onValueChange = onTitleChange,
+                    label = { Text("Timetable Title") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text("Year:", fontWeight = FontWeight.Bold)
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = selectedYear == "2025",
+                        onClick = { onYearChange("2025") }
+                    )
+                    Text("2025")
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text("Term:", fontWeight = FontWeight.Bold)
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = selectedTerm == "Winter",
+                        onClick = { onTermChange("Winter") }
+                    )
+                    Text("Winter")
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = selectedTerm == "Spring",
+                        onClick = { onTermChange("Spring") }
+                    )
+                    Text("Spring")
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = selectedTerm == "Summer",
+                        onClick = { onTermChange("Summer") }
+                    )
+                    Text("Summer")
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = selectedTerm == "Autumn",
+                        onClick = { onTermChange("Autumn") }
+                    )
+                    Text("Autumn")
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Create")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteTimetableDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Timetable") },
+        text = { Text("Are you sure you want to delete this timetable? This action cannot be undone.") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
