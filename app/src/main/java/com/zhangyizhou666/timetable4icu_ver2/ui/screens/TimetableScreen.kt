@@ -123,15 +123,25 @@ fun TimetableScreen(
                 }
             )
         }
-    ) {
+    ) { 
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
                     title = { 
-                        Text(
-                            text = viewModel.currentTimetableTitle.ifEmpty { "Timetable" },
-                            color = Silver
-                        ) 
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = viewModel.currentTimetableTitle.ifEmpty { "Timetable" },
+                                color = Silver
+                            )
+                            val credits by viewModel.selectedCourseCredits.collectAsState()
+                            Text(
+                                text = "Credits: $credits",
+                                color = Silver,
+                                fontSize = 12.sp
+                            )
+                        }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = DarkBlue
@@ -166,8 +176,8 @@ fun TimetableScreen(
                     }
                 )
             }
-        ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding)) {
+        ) { paddingValues ->
+            Box(modifier = Modifier.padding(paddingValues)) {
                 // Main content
                 TimetableContent(navController, viewModel)
                 

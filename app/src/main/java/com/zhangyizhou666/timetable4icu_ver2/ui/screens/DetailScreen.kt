@@ -323,7 +323,7 @@ fun DetailScreen(
             courseTitle = courseTitle,
             onDismiss = { showAddTaskDialog = false },
             onTaskAdded = { title, details, dueDate ->
-                viewModel.addTask(title, details, courseTitle, dueDate)
+                viewModel.addTask(title, details, dueDate, courseTitle)
                 // Refresh tasks list
                 tasks = viewModel.getAllTasks().filter { it.courseTitle == courseTitle }
                 showAddTaskDialog = false

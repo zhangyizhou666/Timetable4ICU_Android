@@ -70,7 +70,7 @@ fun LunchEditScreen(
                         viewModel.array[dayIndex][periodIndex] = lunchText
                         
                         // Save to Realm
-                        viewModel.saveTimetableData(viewModel.currentTimetableId)
+                        viewModel.saveTimetableData()
                         
                         // Navigate back
                         navController.popBackStack()

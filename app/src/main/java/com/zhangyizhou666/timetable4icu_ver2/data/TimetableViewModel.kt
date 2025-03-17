@@ -156,7 +156,8 @@ class TimetableViewModel : ViewModel() {
         val courseno: String,
         val room: String,
         val mode: String,
-        val color: String = "white"
+        val color: String = "white",
+        val credits: Int = 0
     )
     
     // List of timetables
@@ -166,6 +167,12 @@ class TimetableViewModel : ViewModel() {
     // Tasks list - in memory storage
     private val _tasks = mutableStateListOf<TaskData>()
     val tasks: List<TaskData> = _tasks
+    
+    private val _showRoomName = MutableStateFlow(false)
+    val showRoomName: StateFlow<Boolean> = _showRoomName
+    
+    private val _selectedCourseCredits = MutableStateFlow(0)
+    val selectedCourseCredits: StateFlow<Int> = _selectedCourseCredits
     
     init {
         // Add a default timetable if none exists
@@ -314,7 +321,7 @@ class TimetableViewModel : ViewModel() {
         csvData.trim().lines().drop(1).forEach { line ->
             try {
                 val fields = line.split(";")
-                if (fields.size >= 9) {
+                if (fields.size >= 10) {  // Make sure we have at least 10 fields (including credits)
                     // Normalize year and term to handle potential whitespace or formatting issues
                     val csvYear = fields[7].trim()
                     val csvTerm = fields[8].trim()
@@ -331,6 +338,7 @@ class TimetableViewModel : ViewModel() {
                         val courseno = fields[3].trim()
                         val room = fields[4].trim()
                         val mode = fields[5].trim()
+                        val credits = fields[9].trim().toIntOrNull() ?: 0
                         
                         // Skip entries with no schedule information
                         if (schedule != "NO DATA") {
@@ -341,7 +349,8 @@ class TimetableViewModel : ViewModel() {
                                 courseno = courseno,
                                 room = room,
                                 mode = mode,
-                                color = "white"
+                                color = "white",
+                                credits = credits
                             )
                             coursesList.add(courseData)
                         }
@@ -405,6 +414,9 @@ class TimetableViewModel : ViewModel() {
         
         // Save current timetable ID
         saveTimetablesList()
+        
+        // Calculate total credits after loading data
+        calculateTotalCredits()
     }
     
     // Delete a timetable
@@ -612,6 +624,9 @@ class TimetableViewModel : ViewModel() {
         
         // Save the updated timetable data
         saveCurrentTimetableData()
+        
+        // Recalculate total credits
+        calculateTotalCredits()
     }
     
     // Clear cells that had this course but are not in the new schedule
@@ -830,76 +845,102 @@ class TimetableViewModel : ViewModel() {
         return Pair(overlappingSlots.isNotEmpty(), overlappingSlots.joinToString(", "))
     }
     
-    // Save the current timetable data
-    fun saveTimetableData(id: String) {
-        // Save current data to our storage
+    // Calculate total credits for all selected courses
+    private fun calculateTotalCredits() {
+        var totalCredits = 0
+        val courseCodesInTimetable = mutableSetOf<String>()
+        
+        // Loop through all cells to find selected courses
+        for (i in 0 until 6) {  // Days (including Saturday)
+            for (j in 0 until 9) {  // Periods (including lunch)
+                val title = array[i][j]
+                if (title.isNotEmpty()) {
+                    // Extract course code from title (usually before the first space)
+                    val courseCode = if (title.contains(" ")) title.split(" ")[0] else title
+                    courseCodesInTimetable.add(courseCode)
+                }
+            }
+        }
+        
+        // Sum up credits for each unique course
+        courseCodesInTimetable.forEach { courseCode ->
+            // Find the course in our loaded courses data
+            _coursesData.value.find { 
+                it.courseTitle.startsWith(courseCode) || it.courseno == courseCode 
+            }?.let { course ->
+                totalCredits += course.credits
+            }
+        }
+        
+        _selectedCourseCredits.value = totalCredits
+    }
+    
+    // Update course title in a cell
+    fun updateCourseTitle(dayIndex: Int, periodIndex: Int, title: String) {
+        array[dayIndex][periodIndex] = title
         saveCurrentTimetableData()
     }
     
-    // Clean up resources
-    override fun onCleared() {
-        super.onCleared()
-        RealmManager.closeRealm()
+    // Public method to manually recalculate credits
+    fun recalculateCredits() {
+        calculateTotalCredits()
     }
     
-    // Debug method to print course data
-    fun printCourseData(): String {
-        val sb = StringBuilder()
-        sb.appendLine("Total courses: ${coursesData.value.size}")
-        
-        coursesData.value.take(10).forEach { course ->
-            sb.appendLine("Course: ${course.courseTitle}")
-            sb.appendLine("  Schedule: ${course.schedule}")
-            sb.appendLine("  Instructor: ${course.instructor}")
-            sb.appendLine("  Room: ${course.room}")
-            sb.appendLine("  Course No: ${course.courseno}")
-            sb.appendLine("  Mode: ${course.mode}")
-            sb.appendLine("-------------------")
+    // Get all tasks
+    fun getAllTasks(): List<TaskData> {
+        return _tasks.toList()
+    }
+    
+    // Update task completion status
+    fun updateTask(taskId: String, isDone: Boolean) {
+        val taskIndex = _tasks.indexOfFirst { it.id == taskId }
+        if (taskIndex >= 0) {
+            val updatedTask = _tasks[taskIndex].copy(isDone = isDone)
+            _tasks[taskIndex] = updatedTask
+            saveTasksToSharedPreferences()
         }
-        
-        return sb.toString()
+    }
+    
+    // Delete a task
+    fun deleteTask(taskId: String) {
+        val taskIndex = _tasks.indexOfFirst { it.id == taskId }
+        if (taskIndex >= 0) {
+            _tasks.removeAt(taskIndex)
+            saveTasksToSharedPreferences()
+        }
+    }
+    
+    // Add a new task
+    fun addTask(title: String, details: String, dueDate: Long, courseTitle: String) {
+        val newTask = TaskData(
+            title = title,
+            details = details,
+            dueDate = dueDate,
+            courseTitle = courseTitle
+        )
+        _tasks.add(newTask)
+        saveTasksToSharedPreferences()
     }
     
     // Save tasks to SharedPreferences
-    private fun saveTasks() {
+    private fun saveTasksToSharedPreferences() {
         sharedPreferences?.edit()?.apply {
             putString("tasks", gson.toJson(_tasks))
             apply()
         }
     }
     
-    // Task management methods
-    fun addTask(title: String, details: String, courseTitle: String, dueDate: Long = 0) {
-        val newTask = TaskData(
-            id = UUID.randomUUID().toString(),
-            title = title,
-            details = details,
-            isDone = false,
-            dueDate = dueDate,
-            courseTitle = courseTitle
-        )
-        _tasks.add(newTask)
-        saveTasks()
+    // Public method to save current timetable data
+    fun saveTimetableData() {
+        saveCurrentTimetableData()
     }
     
-    fun updateTask(id: String, isDone: Boolean) {
-        val index = _tasks.indexOfFirst { it.id == id }
-        if (index != -1) {
-            val task = _tasks[index]
-            _tasks[index] = task.copy(isDone = isDone)
-            saveTasks()
+    // Debug method to print course data
+    fun printCourseData(): String {
+        val sb = StringBuilder()
+        _coursesData.value.forEach { course ->
+            sb.append("${course.courseTitle}, ${course.instructor}, ${course.schedule}, ${course.courseno}, ${course.room}, ${course.mode}, ${course.color}, ${course.credits}\n")
         }
-    }
-    
-    fun deleteTask(id: String) {
-        val index = _tasks.indexOfFirst { it.id == id }
-        if (index != -1) {
-            _tasks.removeAt(index)
-            saveTasks()
-        }
-    }
-    
-    fun getAllTasks(): List<TaskData> {
-        return _tasks
+        return sb.toString()
     }
 } 

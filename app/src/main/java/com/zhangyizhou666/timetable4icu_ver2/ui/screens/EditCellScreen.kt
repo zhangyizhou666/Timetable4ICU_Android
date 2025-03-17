@@ -403,6 +403,17 @@ fun EditCellScreen(
                                         fontSize = 14.sp
                                     )
                                 }
+                                
+                                // Display credits
+                                if (course.credits > 0) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Credits: ${course.credits}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     }
