@@ -1,0 +1,52 @@
+# Standardized Schedule Time Format
+
+This document explains the standardized format for the `schedule_time` field in the CSV data file. The format is designed to be easily parsable and similar to the iCalendar format for better interoperability.
+
+## Current Format
+Currently, the `schedule_time` field uses a format like:
+```
+"Monday 11:35-12:50; Tuesday 15:25-16:40; Wednesday 11:35-12:50; Friday 11:35-12:50"
+```
+
+## Recommended ICS-like Format
+
+For better programmatic processing, we recommend using a format like:
+```
+M/11:35-12:50,TU/15:25-16:40,W/11:35-12:50,F/11:35-12:50
+```
+
+Where:
+- Day codes are consistent with the schedule field: M, TU, W, TH, F, SA, SU
+- Each time slot is represented as `DAY/START-END`
+- Multiple slots are separated by commas (no spaces)
+- Times are in 24-hour format (HH:MM)
+
+## Example Conversion
+
+### Current CSV:
+```
+title;instructor;schedule;courseno;room;teaching mode;lang;year;term;credits;schedule_time
+"リベラルアーツ英語プログラム：論文作成";STAFF;3/M,5/TU,3/W,3/F;ELA060;NO DATA;Face to Face;E;2025;Spring;3;"Monday 11:35-12:50; Tuesday 15:25-16:40; Wednesday 11:35-12:50; Friday 11:35-12:50"
+```
+
+### Recommended CSV:
+```
+title;instructor;schedule;courseno;room;teaching mode;lang;year;term;credits;schedule_time
+"リベラルアーツ英語プログラム：論文作成";STAFF;3/M,5/TU,3/W,3/F;ELA060;NO DATA;Face to Face;E;2025;Spring;3;M/11:35-12:50,TU/15:25-16:40,W/11:35-12:50,F/11:35-12:50
+```
+
+## Benefits
+
+1. **Simplicity**: The format is more compact and easier to parse
+2. **Consistency**: Uses the same day codes as the schedule field
+3. **Efficiency**: Eliminates the need for complex regex parsing
+4. **Reliability**: Reduces the risk of parsing errors
+5. **Performance**: Faster processing of schedule data
+
+## Implementation Notes
+
+The app's `TimetableViewModel` has been updated to handle both formats:
+1. The original format using natural language day names and semicolon separators
+2. The new ICS-like format that's more machine-friendly
+
+When creating new CSV data files, we recommend adopting the new format for better performance and consistency. 

@@ -1,5 +1,6 @@
 package com.zhangyizhou666.timetable4icu_ver2.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -49,12 +51,16 @@ fun ScheduleEditorDialog(
     var selectedTime by remember { mutableStateOf("1") }
     var showConflictAlert by remember { mutableStateOf(false) }
     var showMissingAlert by remember { mutableStateOf(false) }
+    var showOverlapWarning by remember { mutableStateOf(false) }
+    var overlapCourseNames by remember { mutableStateOf("") }
     
     val days = listOf("M", "TU", "W", "TH", "F", "SA")
-    val times = listOf("1", "2", "3", "4", "*4", "5", "6", "7", "8")
+    val times = listOf("1", "2", "3", "4", "5", "6", "7", "8")
     
     var dayExpanded by remember { mutableStateOf(false) }
     var timeExpanded by remember { mutableStateOf(false) }
+    
+    val context = LocalContext.current
     
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -168,10 +174,18 @@ fun ScheduleEditorDialog(
                             showConflictAlert = true
                         } else {
                             // Check for overlaps with other courses
-                            val result = viewModel.checkCourseOverlap(courseTitle, scheduleToAdd)
+                            val result = viewModel.checkCourseOverlap(courseTitle, scheduleToAdd, "", "")
                             val hasOverlap = result.first
+                            val overlapCourses = result.second
                             
-                            // Add to schedule even if there's an overlap
+                            // Even if there's an overlap, we'll handle it at the EditCellScreen level
+                            // This just shows a warning that there might be conflicts
+                            if (hasOverlap) {
+                                showOverlapWarning = true
+                                overlapCourseNames = overlapCourses
+                            }
+                            
+                            // Add to schedule
                             currentSchedule = if (currentSchedule.isEmpty()) {
                                 scheduleToAdd
                             } else {
@@ -256,6 +270,19 @@ fun ScheduleEditorDialog(
             text = { Text("This time slot is not in the current schedule.") },
             confirmButton = {
                 Button(onClick = { showMissingAlert = false }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+    
+    if (showOverlapWarning) {
+        AlertDialog(
+            onDismissRequest = { showOverlapWarning = false },
+            title = { Text("Potential Conflict") },
+            text = { Text("This schedule may conflict with: $overlapCourseNames\n\nConflicts will be resolved when you save.") },
+            confirmButton = {
+                Button(onClick = { showOverlapWarning = false }) {
                     Text("OK")
                 }
             }

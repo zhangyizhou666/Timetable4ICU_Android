@@ -73,6 +73,8 @@ fun EditCellScreen(
     var courseno by remember { mutableStateOf(viewModel.arrayCourseno[dayIndex][periodIndex]) }
     var mode by remember { mutableStateOf(viewModel.arrayMode[dayIndex][periodIndex]) }
     var colorName by remember { mutableStateOf(viewModel.arrayColor[dayIndex][periodIndex]) }
+    var startTime by remember { mutableStateOf(viewModel.arrayStartTime[dayIndex][periodIndex]) }
+    var endTime by remember { mutableStateOf(viewModel.arrayEndTime[dayIndex][periodIndex]) }
     
     var showCourseList by remember { mutableStateOf(false) }
     var filteredCourses by remember { mutableStateOf(emptyList<TimetableViewModel.CourseData>()) }
@@ -85,8 +87,8 @@ fun EditCellScreen(
     var overlappingSlots by remember { mutableStateOf("") }
     
     LaunchedEffect(cellName) {
-        // Load courses for this cell
-        filteredCourses = viewModel.filterCoursesForCell(cellName)
+        // Load courses for this cell using time-based filtering
+        filteredCourses = viewModel.filterCoursesForTimeSlot(dayIndex, periodIndex)
     }
     
     Scaffold(
@@ -122,7 +124,9 @@ fun EditCellScreen(
                             courseno = courseno,
                             room = room,
                             mode = mode,
-                            colorName = colorName
+                            colorName = colorName,
+                            startTime = startTime,
+                            endTime = endTime
                         )
                         
                         // Navigate back
@@ -224,6 +228,23 @@ fun EditCellScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
+                // Time fields
+                OutlinedTextField(
+                    value = startTime,
+                    onValueChange = { startTime = it },
+                    label = { Text("Start Time (HH:MM)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                OutlinedTextField(
+                    value = endTime,
+                    onValueChange = { endTime = it },
+                    label = { Text("End Time (HH:MM)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Color selection
@@ -276,6 +297,8 @@ fun EditCellScreen(
                         courseno = ""
                         mode = ""
                         colorName = "white"
+                        startTime = ""
+                        endTime = ""
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -302,118 +325,152 @@ fun EditCellScreen(
                 Divider()
                 
                 Spacer(modifier = Modifier.height(8.dp))
-                
-                Button(
-                    onClick = { showCourseList = !showCourseList },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = if (showCourseList) "Hide Courses" else "Show Courses")
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
             }
             
             // Course list
-            if (showCourseList) {
-                if (filteredCourses.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No courses available for this time slot",
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                } else {
-                    items(filteredCourses) { course ->
-                        Card(
+            if (filteredCourses.isEmpty()) {
+                item {
+                    Text(
+                        text = "No courses available for this time slot",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            } else {
+                items(filteredCourses) { course ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                // Check for course overlap using time information
+                                val result = viewModel.checkCourseOverlap(
+                                    course.courseTitle, 
+                                    course.schedule,
+                                    course.startTime,
+                                    course.endTime
+                                )
+                                val hasOverlap = result.first
+                                val overlapCourses = result.second
+                                
+                                if (hasOverlap) {
+                                    // Create a list of conflicting course titles
+                                    val conflictingCourseTitles = overlapCourses.split(", ")
+                                    
+                                    // Remove all conflicting courses completely
+                                    conflictingCourseTitles.forEach { conflictingTitle ->
+                                        if (conflictingTitle.isNotEmpty()) {
+                                            // Call deleteCourse to remove the entire course
+                                            viewModel.deleteCourse(conflictingTitle)
+                                        }
+                                    }
+                                    
+                                    // Show a toast indicating which courses were removed
+                                    Toast.makeText(
+                                        context,
+                                        "Removed conflicting ${if (conflictingCourseTitles.size > 1) "courses" else "course"}: $overlapCourses",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                
+                                courseTitle = course.courseTitle
+                                instructor = course.instructor
+                                schedule = course.schedule
+                                room = course.room
+                                courseno = course.courseno
+                                mode = course.mode
+                                startTime = course.startTime
+                                endTime = course.endTime
+                                
+                                // Assign color based on course type
+                                colorName = when {
+                                    course.courseno.startsWith("ELA") -> "lightBlue"
+                                    course.courseno.startsWith("JLP") -> "lightGreen"
+                                    course.courseno.startsWith("GEX") -> "lightPurple"
+                                    course.courseno.startsWith("HSS") -> "lightOrange"
+                                    course.courseno.startsWith("MCC") -> "rosePink"
+                                    course.courseno.startsWith("LNG") -> "lightYellow"
+                                    else -> "white"
+                                }
+                            }
+                    ) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clickable {
-                                    // Check for course overlap
-                                    val result = viewModel.checkCourseOverlap(course.courseTitle, course.schedule)
-                                    val hasOverlap = result.first
-                                    val overlapSlots = result.second
-                                    
-                                    if (hasOverlap) {
-                                        showOverlapWarning = true
-                                        overlappingSlots = overlapSlots
-                                        Toast.makeText(
-                                            context, 
-                                            "Warning: This course overlaps with existing courses at: $overlapSlots",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    }
-                                    
-                                    courseTitle = course.courseTitle
-                                    instructor = course.instructor
-                                    schedule = course.schedule
-                                    room = course.room
-                                    courseno = course.courseno
-                                    mode = course.mode
-                                    
-                                    // Assign color based on course type
-                                    colorName = when {
-                                        course.courseno.startsWith("ELA") -> "lightBlue"
-                                        course.courseno.startsWith("JLP") -> "lightGreen"
-                                        course.courseno.startsWith("GEX") -> "lightPurple"
-                                        course.courseno.startsWith("HSS") -> "lightOrange"
-                                        course.courseno.startsWith("MCC") -> "rosePink"
-                                        course.courseno.startsWith("LNG") -> "lightYellow"
-                                        else -> "white"
-                                    }
-                                }
+                                .padding(16.dp)
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
-                            ) {
-                                Text(
-                                    text = course.courseTitle,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                
+                            Text(
+                                text = course.courseTitle,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            Text(
+                                text = "Instructor: ${course.instructor}",
+                                fontSize = 14.sp
+                            )
+                            
+                            if (course.room.isNotEmpty() && course.room != "NO DATA") {
                                 Spacer(modifier = Modifier.height(4.dp))
-                                
                                 Text(
-                                    text = "Instructor: ${course.instructor}",
+                                    text = "Room: ${course.room}",
                                     fontSize = 14.sp
                                 )
-                                
-                                if (course.room.isNotEmpty() && course.room != "NO DATA") {
-                                    Spacer(modifier = Modifier.height(4.dp))
+                            }
+                            
+                            if (course.courseno.isNotEmpty() && course.courseno != "NO DATA") {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Course No: ${course.courseno}",
+                                    fontSize = 14.sp
+                                )
+                            }
+                            
+                            if (course.mode.isNotEmpty() && course.mode != "NO DATA") {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Mode: ${course.mode}",
+                                    fontSize = 14.sp
+                                )
+                            }
+                            
+                            // Display time information if available
+                            if (course.timeSlots.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Column {
                                     Text(
-                                        text = "Room: ${course.room}",
-                                        fontSize = 14.sp
-                                    )
-                                }
-                                
-                                if (course.courseno.isNotEmpty() && course.courseno != "NO DATA") {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Course No: ${course.courseno}",
-                                        fontSize = 14.sp
-                                    )
-                                }
-                                
-                                if (course.mode.isNotEmpty() && course.mode != "NO DATA") {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Mode: ${course.mode}",
-                                        fontSize = 14.sp
-                                    )
-                                }
-                                
-                                // Display credits
-                                if (course.credits > 0) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Credits: ${course.credits}",
+                                        text = "Time Slots:",
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = Color(0xFF007ACC) // Blue color for time header
                                     )
+                                    course.timeSlots.forEach { slot ->
+                                        Text(
+                                            text = "${getDayName(slot.day)}: ${slot.startTime} - ${slot.endTime}",
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF007ACC) // Blue color for time
+                                        )
+                                    }
                                 }
+                            } else if (course.startTime.isNotEmpty() && course.endTime.isNotEmpty()) {
+                                // Fallback to old way if timeSlots is empty but we have startTime/endTime
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Time: ${course.startTime} - ${course.endTime}",
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF007ACC) // Blue color for time
+                                )
+                            }
+                            
+                            // Display credits
+                            if (course.credits > 0) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Credits: ${course.credits}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
                     }
@@ -475,3 +532,17 @@ fun Modifier.borderDecorator(width: androidx.compose.ui.unit.Dp, color: androidx
             .background(color, shape)
             .padding(width)
     ) 
+
+// Helper function to convert day code to full name
+private fun getDayName(dayCode: String): String {
+    return when (dayCode) {
+        "M" -> "Monday"
+        "TU" -> "Tuesday"
+        "W" -> "Wednesday"
+        "TH" -> "Thursday"
+        "F" -> "Friday"
+        "SA" -> "Saturday"
+        "SU" -> "Sunday"
+        else -> dayCode
+    }
+} 

@@ -12,23 +12,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,16 +39,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.zhangyizhou666.timetable4icu_ver2.data.TimetableViewModel
-import com.zhangyizhou666.timetable4icu_ver2.data.TaskData
 import com.zhangyizhou666.timetable4icu_ver2.ui.theme.DarkBlue
 import com.zhangyizhou666.timetable4icu_ver2.ui.theme.Silver
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,8 +61,6 @@ fun DetailScreen(
     val color = viewModel.arrayColor[dayIndex][periodIndex]
     
     var showDeleteConfirmation by remember { mutableStateOf(false) }
-    var showAddTaskDialog by remember { mutableStateOf(false) }
-    var tasks by remember { mutableStateOf(viewModel.getAllTasks().filter { it.courseTitle == courseTitle }) }
     
     Scaffold(
         topBar = {
@@ -121,11 +108,6 @@ fun DetailScreen(
                         
                         Spacer(modifier = Modifier.weight(1f))
                     }
-                    
-                    Divider(
-                        color = Color.Blue,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
                     
                     Surface(
                         modifier = Modifier
@@ -175,118 +157,6 @@ fun DetailScreen(
                     }
                 }
             }
-            
-            // Tasks Section
-            item {
-                Column(modifier = Modifier.padding(top = 16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Tasks",
-                            color = Color.Blue,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                        
-                        Spacer(modifier = Modifier.weight(1f))
-                        
-                        IconButton(onClick = { showAddTaskDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Task",
-                                tint = Color.Blue
-                            )
-                        }
-                    }
-                    
-                    Divider(
-                        color = Color.Blue,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                    
-                    if (tasks.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("No tasks yet. Tap + to add a task.")
-                        }
-                    }
-                }
-            }
-            
-            // Task list
-            items(tasks) { task ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color.LightGray.copy(alpha = 0.2f)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = task.isDone,
-                            onCheckedChange = { isChecked ->
-                                viewModel.updateTask(task.id, isChecked)
-                                // Refresh tasks list
-                                tasks = viewModel.getAllTasks().filter { it.courseTitle == courseTitle }
-                            }
-                        )
-                        
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 8.dp)
-                        ) {
-                            Text(
-                                text = task.title,
-                                fontWeight = FontWeight.Bold,
-                                style = if (task.isDone) MaterialTheme.typography.bodyMedium.copy(
-                                    color = Color.Gray
-                                ) else MaterialTheme.typography.bodyMedium
-                            )
-                            
-                            if (task.details.isNotEmpty()) {
-                                Text(
-                                    text = task.details,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.Gray
-                                )
-                            }
-                            
-                            Text(
-                                text = "Due: ${formatDate(task.dueDate)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.Gray
-                            )
-                        }
-                        
-                        IconButton(
-                            onClick = {
-                                viewModel.deleteTask(task.id)
-                                // Refresh tasks list
-                                tasks = viewModel.getAllTasks().filter { it.courseTitle == courseTitle }
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete Task",
-                                tint = Color.Red
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
     
@@ -295,7 +165,7 @@ fun DetailScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
             title = { Text("Delete Course") },
-            text = { Text("Are you sure you want to delete this course? This will remove it from all cells and delete all associated tasks.") },
+            text = { Text("Are you sure you want to delete this course? This will remove it from all cells.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -313,20 +183,6 @@ fun DetailScreen(
                 ) {
                     Text("Cancel")
                 }
-            }
-        )
-    }
-    
-    // Add Task Dialog
-    if (showAddTaskDialog) {
-        AddTaskDialog(
-            courseTitle = courseTitle,
-            onDismiss = { showAddTaskDialog = false },
-            onTaskAdded = { title, details, dueDate ->
-                viewModel.addTask(title, details, dueDate, courseTitle)
-                // Refresh tasks list
-                tasks = viewModel.getAllTasks().filter { it.courseTitle == courseTitle }
-                showAddTaskDialog = false
             }
         )
     }
@@ -361,92 +217,4 @@ fun InfoRow(label: String, value: String) {
             modifier = Modifier.weight(1f)
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddTaskDialog(
-    courseTitle: String,
-    onDismiss: () -> Unit,
-    onTaskAdded: (title: String, details: String, dueDate: Long) -> Unit
-) {
-    var taskTitle by remember { mutableStateOf("") }
-    var taskDetails by remember { mutableStateOf("") }
-    
-    // Set default due date to 1 week from now
-    val calendar = Calendar.getInstance()
-    calendar.add(Calendar.DAY_OF_YEAR, 7)
-    val dueDate = calendar.timeInMillis
-    
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
-                Text(
-                    text = "Add Task for $courseTitle",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                
-                OutlinedTextField(
-                    value = taskTitle,
-                    onValueChange = { taskTitle = it },
-                    label = { Text("Task Title") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                )
-                
-                OutlinedTextField(
-                    value = taskDetails,
-                    onValueChange = { taskDetails = it },
-                    label = { Text("Details (Optional)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                )
-                
-                Text(
-                    text = "Due Date: ${formatDate(dueDate)} (1 week from now)",
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text("Cancel")
-                    }
-                    
-                    Button(
-                        onClick = {
-                            if (taskTitle.isNotEmpty()) {
-                                onTaskAdded(taskTitle, taskDetails, dueDate)
-                            }
-                        },
-                        enabled = taskTitle.isNotEmpty()
-                    ) {
-                        Text("Add Task")
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun formatDate(timestamp: Long): String {
-    val dateFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
-    return dateFormat.format(Date(timestamp))
 } 

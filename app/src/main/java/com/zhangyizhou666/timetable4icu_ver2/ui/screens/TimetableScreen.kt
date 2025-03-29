@@ -4,15 +4,10 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -51,8 +46,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -231,6 +229,8 @@ private fun TimetableContent(
     navController: NavController,
     viewModel: TimetableViewModel
 ) {
+    val context = LocalContext.current
+    
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -285,55 +285,56 @@ private fun TimetableContent(
                 }
                 
                 periods.forEach { period ->
-                    if (period == "L") {
-                        // Lunch period
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(30.dp)
-                                .background(Color.Gray),
-                            contentAlignment = Alignment.Center
+                    // Regular period display for all periods including lunch
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = "L",
-                                color = Color.White,
-                                fontSize = 14.sp
-                            )
-                        }
-                    } else {
-                        // Regular period
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                if (viewModel.showTimeDetails) {
-                                    val timeDetail = viewModel.timeDetailWithEighth[period]
-                                    Text(
-                                        text = timeDetail?.first ?: "",
-                                        fontSize = 10.sp,
-                                        color = Color.Gray
-                                    )
+                            if (viewModel.showTimeDetails) {
+                                val periodNum = when (period) {
+                                    "L" -> 3
+                                    "4" -> 4
+                                    "5" -> 5
+                                    "6" -> 6
+                                    "7" -> 7
+                                    "8" -> 8
+                                    else -> period.toIntOrNull()?.minus(1) ?: 0
                                 }
-                                
+                                val timeDetail = viewModel.getTimeDetails(0, periodNum) // Using Monday as reference
                                 Text(
-                                    text = period,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = timeDetail.first,
+                                    fontSize = 10.sp,
+                                    color = Color.Gray
                                 )
-                                
-                                if (viewModel.showTimeDetails) {
-                                    val timeDetail = viewModel.timeDetailWithEighth[period]
-                                    Text(
-                                        text = timeDetail?.second ?: "",
-                                        fontSize = 10.sp,
-                                        color = Color.Gray
-                                    )
+                            }
+                            
+                            Text(
+                                text = period,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            if (viewModel.showTimeDetails) {
+                                val periodNum = when (period) {
+                                    "L" -> 3
+                                    "4" -> 4
+                                    "5" -> 5
+                                    "6" -> 6
+                                    "7" -> 7
+                                    "8" -> 8
+                                    else -> period.toIntOrNull()?.minus(1) ?: 0
                                 }
+                                val timeDetail = viewModel.getTimeDetails(0, periodNum) // Using Monday as reference
+                                Text(
+                                    text = timeDetail.second,
+                                    fontSize = 10.sp,
+                                    color = Color.Gray
+                                )
                             }
                         }
                     }
@@ -346,99 +347,142 @@ private fun TimetableContent(
             val dayCount = if (viewModel.showSaturday) 6 else 5
             val periodCount = if (viewModel.showEighthPeriod) 9 else 8
             
-            for (dayIndex in 0 until dayCount) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .border(0.5.dp, SeparatorColor)
-                ) {
-                    for (periodIndex in 0 until periodCount) {
-                        val cellSize = viewModel.calculateCellSize(dayIndex, periodIndex)
-                        
-                        // Skip cells that are continuations of previous cells
-                        if (cellSize == 0f) continue
-                        
-                        if (periodIndex == 3) {
-                            // Lunch period
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(30.dp)
-                                    .background(
-                                        if (viewModel.array[dayIndex][periodIndex].isNotEmpty()) {
-                                            getColorFromName(viewModel.arrayColor[dayIndex][periodIndex])
-                                        } else {
-                                            Color.Gray
-                                        }
-                                    )
-                                    .clickable {
-                                        // Navigate to lunch edit screen
-                                        navController.navigate("lunch/$dayIndex/$periodIndex")
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = viewModel.array[dayIndex][periodIndex],
-                                    color = Color.Black,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        } else {
-                            // Regular period
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(cellSize)
-                                    .background(getColorFromName(viewModel.arrayColor[dayIndex][periodIndex]))
-                                    .combinedClickable(
-                                        onClick = {
-                                            // Navigate to cell edit screen
-                                            navController.navigate("edit/$dayIndex/$periodIndex")
-                                        },
-                                        onLongClick = {
-                                            // Only navigate to details if cell has content
-                                            if (viewModel.array[dayIndex][periodIndex].isNotEmpty()) {
-                                                navController.navigate("detail/$dayIndex/$periodIndex")
+            // Create a container for the timetable grid with overlay
+            Box(modifier = Modifier.weight(1f)) {
+                // Background grid (days and periods)
+                Row(modifier = Modifier.fillMaxSize()) {
+                    for (dayIndex in 0 until dayCount) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .border(0.5.dp, SeparatorColor)
+                        ) {
+                            for (periodIndex in 0 until periodCount) {
+                                val cellSize = 1f  // Keep all cells equal size
+                                
+                                // Regular period (including lunch)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(cellSize)
+                                        .background(Color.Transparent)
+                                        .clickable {
+                                            // Navigate to appropriate edit screen
+                                            if (periodIndex == 3) {
+                                                // Navigate to lunch edit screen
+                                                navController.navigate("lunch/$dayIndex/$periodIndex")
+                                            } else {
+                                                // Navigate to cell edit screen
+                                                navController.navigate("edit/$dayIndex/$periodIndex")
                                             }
-                                        }
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {}
+                                
+                                // Only show divider if needed
+                                if (periodIndex < periodCount - 1) {
+                                    Divider(color = SeparatorColor)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Course overlay based on time
+                Row(modifier = Modifier.fillMaxSize()) {
+                    for (dayIndex in 0 until dayCount) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                        ) {
+                            for (periodIndex in 0 until periodCount) {
                                 if (viewModel.shouldShowCellContent(dayIndex, periodIndex)) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.padding(4.dp)
+                                    val courseTitle = viewModel.array[dayIndex][periodIndex]
+                                    val schedule = viewModel.arraySchedule[dayIndex][periodIndex]
+                                    val room = viewModel.arrayRoom[dayIndex][periodIndex]
+                                    val colorName = viewModel.arrayColor[dayIndex][periodIndex]
+                                    
+                                    // Get time details for this period (now using our enhanced getTimeDetails)
+                                    val (startTime, endTime) = viewModel.getTimeDetails(dayIndex, periodIndex)
+                                    
+                                    // Course box
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 1.dp)
+                                            .height(calculateCellHeight(periodIndex).dp)
+                                            .offset(y = calculateTopOffset(periodIndex).dp)
+                                            .background(
+                                                getColorFromName(colorName).copy(alpha = 0.9f),
+                                                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                color = getColorFromName(colorName).copy(alpha = 0.7f),
+                                                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                                            )
+                                            .padding(4.dp)
+                                            .combinedClickable(
+                                                onClick = {
+                                                    if (periodIndex == 3) {
+                                                        navController.navigate("lunch/$dayIndex/$periodIndex")
+                                                    } else {
+                                                        navController.navigate("edit/$dayIndex/$periodIndex")
+                                                    }
+                                                },
+                                                onLongClick = {
+                                                    Toast.makeText(context, "$startTime - $endTime", Toast.LENGTH_LONG).show()
+                                                    navController.navigate("detail/$dayIndex/$periodIndex")
+                                                }
+                                            ),
+                                        contentAlignment = Alignment.TopStart
                                     ) {
-                                        Text(
-                                            text = viewModel.array[dayIndex][periodIndex],
-                                            fontSize = 12.sp,
-                                            textAlign = TextAlign.Center
-                                        )
-                                        
-                                        if (viewModel.arrayRoom[dayIndex][periodIndex].isNotEmpty() && 
-                                            viewModel.arrayRoom[dayIndex][periodIndex] != "NO DATA") {
-                                            Spacer(modifier = Modifier.height(4.dp))
+                                        Column {
                                             Text(
-                                                text = viewModel.arrayRoom[dayIndex][periodIndex],
+                                                text = courseTitle,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Start,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            
+                                            if (room.isNotEmpty() && room != "NO DATA") {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = room,
+                                                    fontSize = 10.sp,
+                                                    textAlign = TextAlign.Start,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "$startTime-$endTime",
                                                 fontSize = 10.sp,
-                                                textAlign = TextAlign.Center
+                                                color = Color.DarkGray,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
                                 }
                             }
                         }
-                        
-                        // Only show divider if needed
-                        if (viewModel.shouldShowDivider(dayIndex, periodIndex)) {
-                            Divider(color = SeparatorColor)
-                        }
                     }
                 }
             }
         }
     }
+}
+
+// Helper function to convert time string (HH:MM) to minutes since midnight
+private fun timeToMinutes(time: String): Int {
+    val parts = time.split(":")
+    if (parts.size != 2) return 0
+    return parts[0].toIntOrNull()?.times(60)?.plus(parts[1].toIntOrNull() ?: 0) ?: 0
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -738,4 +782,48 @@ private fun DeleteTimetableDialog(
             }
         }
     )
+}
+
+@Composable
+fun TimeBasedCourseDisplay(
+    viewModel: TimetableViewModel,
+    dayIndex: Int,
+    periodIndex: Int,
+    courseTitle: String,
+    schedule: String,
+    room: String,
+    colorName: String,
+    modifier: Modifier = Modifier
+) {
+    // 删除整个函数体
+}
+
+// Calculate cell height based on period index
+private fun calculateCellHeight(periodIndex: Int): Float {
+    return when (periodIndex) {
+        3 -> 70f  // Lunch period (70 minutes)
+        else -> 75f // Regular period (75 minutes)
+    }
+}
+
+// Calculate top offset based on period index
+private fun calculateTopOffset(periodIndex: Int): Float {
+    var offset = 0f
+    for (i in 0 until periodIndex) {
+        offset += calculateCellHeight(i)
+        // Add 10dp for break between periods
+        // Add break AFTER periods 1, 2, 4, 5, 6 (indices 0, 1, 4, 5, 6)
+        if (i == 0 || i == 1 || i == 4 || i == 5 || i == 6) {
+            offset += 10f
+        }
+        // Special case: Break after period 3 (index 2) but before lunch
+        if (i == 2) {
+            offset += 10f
+        }
+        // Special case: Break after lunch (index 3) but before period 4
+        if (i == 3) {
+            offset += 10f
+        }
+    }
+    return offset
 }

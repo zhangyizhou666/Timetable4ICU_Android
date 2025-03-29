@@ -46,7 +46,9 @@ data class TimetableData(
     val arrayCourseno: Array<Array<String>> = Array(6) { Array(9) { "" } },
     val arrayRoom: Array<Array<String>> = Array(6) { Array(9) { "" } },
     val arrayMode: Array<Array<String>> = Array(6) { Array(9) { "" } },
-    val arrayColor: Array<Array<String>> = Array(6) { Array(9) { "white" } }
+    val arrayColor: Array<Array<String>> = Array(6) { Array(9) { "white" } },
+    val arrayStartTime: Array<Array<String>> = Array(6) { Array(9) { "" } },
+    val arrayEndTime: Array<Array<String>> = Array(6) { Array(9) { "" } }
 ) {
     // Need to override equals and hashCode because of arrays
     override fun equals(other: Any?): Boolean {
@@ -62,6 +64,8 @@ data class TimetableData(
         if (!arrayRoom.contentDeepEquals(other.arrayRoom)) return false
         if (!arrayMode.contentDeepEquals(other.arrayMode)) return false
         if (!arrayColor.contentDeepEquals(other.arrayColor)) return false
+        if (!arrayStartTime.contentDeepEquals(other.arrayStartTime)) return false
+        if (!arrayEndTime.contentDeepEquals(other.arrayEndTime)) return false
 
         return true
     }
@@ -74,6 +78,8 @@ data class TimetableData(
         result = 31 * result + arrayRoom.contentDeepHashCode()
         result = 31 * result + arrayMode.contentDeepHashCode()
         result = 31 * result + arrayColor.contentDeepHashCode()
+        result = 31 * result + arrayStartTime.contentDeepHashCode()
+        result = 31 * result + arrayEndTime.contentDeepHashCode()
         return result
     }
 }
@@ -88,6 +94,13 @@ data class TaskData(
     val courseTitle: String = ""
 )
 
+// Time slot data class to store standardized time information
+data class TimeSlot(
+    val day: String,        // Short day code: M, TU, W, TH, F, SA, SU
+    val startTime: String,  // Format: HH:MM (24-hour)
+    val endTime: String     // Format: HH:MM (24-hour)
+)
+
 class TimetableViewModel : ViewModel() {
     
     // Current cell arrays for the active timetable
@@ -98,6 +111,8 @@ class TimetableViewModel : ViewModel() {
     var arrayRoom: Array<Array<String>> = Array(6) { Array(9) { "" } }
     var arrayMode: Array<Array<String>> = Array(6) { Array(9) { "" } }
     var arrayColor: Array<Array<String>> = Array(6) { Array(9) { "white" } }
+    var arrayStartTime: Array<Array<String>> = Array(6) { Array(9) { "" } }
+    var arrayEndTime: Array<Array<String>> = Array(6) { Array(9) { "" } }
     
     // Storage for all timetable data
     private val timetableDatas = mutableMapOf<String, TimetableData>()
@@ -135,14 +150,20 @@ class TimetableViewModel : ViewModel() {
     
     // Time details mapping
     val timeDetailWithEighth = mapOf(
-        "1" to Pair("8:50", "10:00"),
-        "2" to Pair("10:10", "11:20"),
-        "3" to Pair("11:30", "12:40"),
-        "4" to Pair("13:50", "15:00"),
-        "5" to Pair("15:10", "16:20"),
-        "6" to Pair("16:30", "17:40"),
-        "7" to Pair("17:50", "19:00"),
-        "8" to Pair("19:10", "20:20")
+        "1" to Pair("8:45", "10:00"),
+        "2" to Pair("10:10", "11:25"),
+        "3" to Pair("11:35", "12:50"),
+        "L" to Pair("12:50", "14:00"),
+        "4" to Pair("14:00", "15:15"),
+        "5" to Pair("15:25", "16:40"),
+        "6" to Pair("16:50", "18:05"),
+        "7" to Pair("18:15", "19:30"),
+        "8" to Pair("19:40", "20:55")
+    )
+    
+    // Lunch time details (now included directly in timeDetailWithEighth)
+    val lunchTimeDetails = mapOf(
+        "L" to Pair("12:50", "14:00")
     )
     
     // Initialize Realm
@@ -157,7 +178,10 @@ class TimetableViewModel : ViewModel() {
         val room: String,
         val mode: String,
         val color: String = "white",
-        val credits: Int = 0
+        val credits: Int = 0,
+        val startTime: String = "", // Time format: HH:MM (24-hour)
+        val endTime: String = "",    // Time format: HH:MM (24-hour)
+        val timeSlots: List<TimeSlot> = emptyList()
     )
     
     // List of timetables
@@ -231,7 +255,9 @@ class TimetableViewModel : ViewModel() {
                         arrayCourseno = dataMap["arrayCourseno"] ?: Array(6) { Array(9) { "" } },
                         arrayRoom = dataMap["arrayRoom"] ?: Array(6) { Array(9) { "" } },
                         arrayMode = dataMap["arrayMode"] ?: Array(6) { Array(9) { "" } },
-                        arrayColor = dataMap["arrayColor"] ?: Array(6) { Array(9) { "white" } }
+                        arrayColor = dataMap["arrayColor"] ?: Array(6) { Array(9) { "white" } },
+                        arrayStartTime = dataMap["arrayStartTime"] ?: Array(6) { Array(9) { "" } },
+                        arrayEndTime = dataMap["arrayEndTime"] ?: Array(6) { Array(9) { "" } }
                     )
                     
                     timetableDatas[timetable.id] = data
@@ -289,7 +315,9 @@ class TimetableViewModel : ViewModel() {
             arrayCourseno = arrayCourseno.map { it.clone() }.toTypedArray(),
             arrayRoom = arrayRoom.map { it.clone() }.toTypedArray(),
             arrayMode = arrayMode.map { it.clone() }.toTypedArray(),
-            arrayColor = arrayColor.map { it.clone() }.toTypedArray()
+            arrayColor = arrayColor.map { it.clone() }.toTypedArray(),
+            arrayStartTime = arrayStartTime.map { it.clone() }.toTypedArray(),
+            arrayEndTime = arrayEndTime.map { it.clone() }.toTypedArray()
         )
         
         // Store it in our map
@@ -303,7 +331,9 @@ class TimetableViewModel : ViewModel() {
             "arrayCourseno" to currentData.arrayCourseno,
             "arrayRoom" to currentData.arrayRoom,
             "arrayMode" to currentData.arrayMode,
-            "arrayColor" to currentData.arrayColor
+            "arrayColor" to currentData.arrayColor,
+            "arrayStartTime" to currentData.arrayStartTime,
+            "arrayEndTime" to currentData.arrayEndTime
         )
         
         // Save to SharedPreferences
@@ -313,56 +343,159 @@ class TimetableViewModel : ViewModel() {
         }
     }
     
-    // Load data from CSV file
-    fun loadCoursesFromCSV(year: String, term: String, csvData: String) {
-        val coursesList = mutableListOf<CourseData>()
+    // Parse schedule_time field with new ICS-like format: "M/11:35-12:50,TU/15:25-16:40,W/11:35-12:50,F/11:35-12:50"
+    private fun parseICSLikeScheduleTime(scheduleTime: String): List<TimeSlot> {
+        val timeSlots = mutableListOf<TimeSlot>()
         
-        // Skip header line and parse CSV data
-        csvData.trim().lines().drop(1).forEach { line ->
-            try {
-                val fields = line.split(";")
-                if (fields.size >= 10) {  // Make sure we have at least 10 fields (including credits)
-                    // Normalize year and term to handle potential whitespace or formatting issues
-                    val csvYear = fields[7].trim()
-                    val csvTerm = fields[8].trim()
+        // If empty or NO DATA, return empty list
+        if (scheduleTime.isEmpty() || scheduleTime == "NO DATA") return timeSlots
+        
+        // Split by comma to get individual time slots
+        val slotEntries = scheduleTime.split(",")
+        
+        for (slotEntry in slotEntries) {
+            val parts = slotEntry.trim().split("/")
+            if (parts.size == 2) {
+                val day = parts[0].trim()
+                val timeRange = parts[1].trim()
+                
+                val timeParts = timeRange.split("-")
+                if (timeParts.size == 2) {
+                    val startTime = timeParts[0].trim()
+                    val endTime = timeParts[1].trim()
                     
-                    if (csvYear == year && csvTerm.equals(term, ignoreCase = true)) {
-                        var lang = ""
-                        if (fields.size > 6 && fields[6] != "NO DATA") {
-                            lang = "(${fields[6]})"
-                        }
-                        
-                        val title = fields[0].trim()
-                        val instructor = fields[1].trim()
-                        val schedule = fields[2].trim()
-                        val courseno = fields[3].trim()
-                        val room = fields[4].trim()
-                        val mode = fields[5].trim()
-                        val credits = fields[9].trim().toIntOrNull() ?: 0
-                        
-                        // Skip entries with no schedule information
-                        if (schedule != "NO DATA") {
-                            val courseData = CourseData(
-                                courseTitle = title + if (lang.isNotEmpty()) " $lang" else "",
-                                instructor = instructor,
-                                schedule = schedule,
-                                courseno = courseno,
-                                room = room,
-                                mode = mode,
-                                color = "white",
-                                credits = credits
-                            )
-                            coursesList.add(courseData)
-                        }
-                    }
+                    // Add the time slot
+                    timeSlots.add(TimeSlot(day, startTime, endTime))
                 }
-            } catch (e: Exception) {
-                // Skip malformed entries
-                e.printStackTrace()
             }
         }
         
-        _coursesData.update { coursesList }
+        return timeSlots
+    }
+    
+    // Parse schedule_time field with format like: "Monday 11:35-12:50; Tuesday 15:25-16:40"
+    private fun parseScheduleTimeField(scheduleTime: String): List<TimeSlot> {
+        val timeSlots = mutableListOf<TimeSlot>()
+        
+        // Split by semicolon to get day-specific time slots
+        val daySchedules = scheduleTime.split(";")
+        
+        for (daySchedule in daySchedules) {
+            val trimmed = daySchedule.trim()
+            if (trimmed.isEmpty()) continue
+            
+            // Pattern: "DayName HH:MM-HH:MM"
+            val regex = """(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})""".toRegex()
+            val matchResult = regex.find(trimmed)
+            
+            if (matchResult != null) {
+                val (dayName, startTime, endTime) = matchResult.destructured
+                
+                // Convert day name to short code
+                val day = when (dayName) {
+                    "Monday" -> "M"
+                    "Tuesday" -> "TU"
+                    "Wednesday" -> "W"
+                    "Thursday" -> "TH"
+                    "Friday" -> "F"
+                    "Saturday" -> "SA"
+                    "Sunday" -> "SU"
+                    else -> ""
+                }
+                
+                if (day.isNotEmpty()) {
+                    timeSlots.add(TimeSlot(day, startTime, endTime))
+                }
+            }
+        }
+        
+        return timeSlots
+    }
+    
+    // Derive time slots from schedule string format like "3/M,5/TU,3/W,3/F"
+    private fun deriveTimeSlotsFromSchedule(schedule: String): List<TimeSlot> {
+        if (schedule == "NO DATA" || schedule.isEmpty()) return emptyList()
+        
+        val timeSlots = mutableListOf<TimeSlot>()
+        val scheduleParts = schedule.split(",")
+        
+        for (part in scheduleParts) {
+            val cleanPart = cleanScheduleString(part.trim())
+            val parts = cleanPart.split("/")
+            
+            if (parts.size == 2) {
+                val periodStr = parts[0]
+                val day = parts[1]
+                
+                // Get time slot for this period
+                val (startTime, endTime) = if (periodStr == "L") {
+                    lunchTimeDetails["L"] ?: Pair("12:50", "14:00")
+                } else {
+                    timeDetailWithEighth[periodStr] ?: Pair("", "")
+                }
+                
+                if (startTime.isNotEmpty() && endTime.isNotEmpty()) {
+                    timeSlots.add(TimeSlot(day, startTime, endTime))
+                }
+            }
+        }
+        
+        return timeSlots
+    }
+    
+    // Generate schedule string from time slots
+    private fun generateScheduleFromTimeSlots(timeSlots: List<TimeSlot>): String {
+        val scheduleParts = mutableListOf<String>()
+        
+        for (slot in timeSlots) {
+            // Find closest period for this time
+            val period = findClosestPeriod(slot.startTime, slot.endTime)
+            if (period.isNotEmpty()) {
+                scheduleParts.add("$period/${slot.day}")
+            }
+        }
+        
+        return scheduleParts.joinToString(",")
+    }
+    
+    // Find the closest period based on start and end times
+    private fun findClosestPeriod(startTime: String, endTime: String): String {
+        // Check lunch period first
+        val lunchTime = lunchTimeDetails["L"] ?: Pair("12:50", "14:00")
+        if (startTime == lunchTime.first && endTime == lunchTime.second) {
+            return "L"
+        }
+        
+        // Check regular periods
+        for ((period, timeRange) in timeDetailWithEighth) {
+            if (startTime == timeRange.first && endTime == timeRange.second) {
+                return period
+            }
+        }
+        
+        // If no exact match, find the closest
+        val startMinutes = timeToMinutes(startTime)
+        val endMinutes = timeToMinutes(endTime)
+        
+        var closestPeriod = ""
+        var minDifference = Int.MAX_VALUE
+        
+        // Check regular periods
+        for ((period, timeRange) in timeDetailWithEighth) {
+            val periodStartMinutes = timeToMinutes(timeRange.first)
+            val periodEndMinutes = timeToMinutes(timeRange.second)
+            
+            val startDiff = Math.abs(startMinutes - periodStartMinutes)
+            val endDiff = Math.abs(endMinutes - periodEndMinutes)
+            val totalDiff = startDiff + endDiff
+            
+            if (totalDiff < minDifference) {
+                minDifference = totalDiff
+                closestPeriod = period
+            }
+        }
+        
+        return closestPeriod
     }
     
     // Create a new timetable
@@ -459,6 +592,8 @@ class TimetableViewModel : ViewModel() {
                 arrayRoom[i][j] = data.arrayRoom[i][j]
                 arrayMode[i][j] = data.arrayMode[i][j]
                 arrayColor[i][j] = data.arrayColor[i][j]
+                arrayStartTime[i][j] = data.arrayStartTime[i][j]
+                arrayEndTime[i][j] = data.arrayEndTime[i][j]
             }
         }
     }
@@ -474,6 +609,8 @@ class TimetableViewModel : ViewModel() {
                 arrayRoom[i][j] = ""
                 arrayMode[i][j] = ""
                 arrayColor[i][j] = "white"
+                arrayStartTime[i][j] = ""
+                arrayEndTime[i][j] = ""
             }
         }
     }
@@ -565,7 +702,9 @@ class TimetableViewModel : ViewModel() {
         courseno: String,
         room: String,
         mode: String,
-        colorName: String
+        colorName: String,
+        startTime: String = "",
+        endTime: String = ""
     ) {
         // First update the primary cell
         array[dayIndex][periodIndex] = courseTitle
@@ -575,6 +714,8 @@ class TimetableViewModel : ViewModel() {
         arrayRoom[dayIndex][periodIndex] = room
         arrayMode[dayIndex][periodIndex] = mode
         arrayColor[dayIndex][periodIndex] = colorName
+        arrayStartTime[dayIndex][periodIndex] = startTime
+        arrayEndTime[dayIndex][periodIndex] = endTime
         
         // First, clear any cells from previous schedule that are no longer in the new schedule
         if (schedule.isNotEmpty()) {
@@ -618,6 +759,8 @@ class TimetableViewModel : ViewModel() {
                     arrayRoom[cellDayIndex][periodNum] = room
                     arrayMode[cellDayIndex][periodNum] = mode
                     arrayColor[cellDayIndex][periodNum] = colorName
+                    arrayStartTime[cellDayIndex][periodNum] = startTime
+                    arrayEndTime[cellDayIndex][periodNum] = endTime
                 }
             }
         }
@@ -648,6 +791,8 @@ class TimetableViewModel : ViewModel() {
                         arrayRoom[dayIndex][periodIndex] = ""
                         arrayMode[dayIndex][periodIndex] = ""
                         arrayColor[dayIndex][periodIndex] = "white"
+                        arrayStartTime[dayIndex][periodIndex] = ""
+                        arrayEndTime[dayIndex][periodIndex] = ""
                     }
                 }
             }
@@ -702,26 +847,33 @@ class TimetableViewModel : ViewModel() {
         return cellNameForRealm[horizontal][vertical]
     }
     
-    // Delete a course completely from all cells
+    // Delete a course from all cells where it appears
     fun deleteCourse(courseTitle: String) {
-        // Find and clear all cells with this course
-        for (dayIndex in 0..5) {
-            for (periodIndex in 0..8) {
-                if (array[dayIndex][periodIndex] == courseTitle) {
-                    // Clear this cell
-                    array[dayIndex][periodIndex] = ""
-                    arrayInstructor[dayIndex][periodIndex] = ""
-                    arraySchedule[dayIndex][periodIndex] = ""
-                    arrayCourseno[dayIndex][periodIndex] = ""
-                    arrayRoom[dayIndex][periodIndex] = ""
-                    arrayMode[dayIndex][periodIndex] = ""
-                    arrayColor[dayIndex][periodIndex] = "white"
+        println("Deleting entire course: $courseTitle")
+        
+        // Iterate through all cells
+        for (i in array.indices) {
+            for (j in array[i].indices) {
+                if (array[i][j] == courseTitle) {
+                    // Clear all data for this cell
+                    array[i][j] = ""
+                    arrayInstructor[i][j] = ""
+                    arraySchedule[i][j] = ""
+                    arrayRoom[i][j] = ""
+                    arrayCourseno[i][j] = ""
+                    arrayMode[i][j] = ""
+                    arrayColor[i][j] = "white"
+                    arrayStartTime[i][j] = ""
+                    arrayEndTime[i][j] = ""
                 }
             }
         }
         
-        // Save the updated timetable data
-        saveCurrentTimetableData()
+        // Save changes
+        saveTimetableData()
+        
+        // Recalculate credits after deletion
+        calculateTotalCredits()
     }
     
     // Filter courses for a specific cell
@@ -786,27 +938,29 @@ class TimetableViewModel : ViewModel() {
     }
     
     // Check for course overlap
-    fun checkCourseOverlap(courseTitle: String, schedule: String): Pair<Boolean, String> {
-        if (schedule.isEmpty()) {
+    fun checkCourseOverlap(courseTitle: String, schedule: String, startTime: String, endTime: String): Pair<Boolean, String> {
+        // Update to use the new timeSlots parameter instead
+        return checkCourseOverlapWithTimeSlots(courseTitle, schedule, parseTimeSlots(schedule, startTime, endTime))
+    }
+    
+    // Check for course overlap using time slots
+    private fun checkCourseOverlapWithTimeSlots(courseTitle: String, schedule: String, timeSlots: List<TimeSlot>): Pair<Boolean, String> {
+        if (schedule.isEmpty() && timeSlots.isEmpty()) {
             return Pair(false, "")
         }
         
-        val scheduleParts = schedule.split(",")
-        val overlappingSlots = mutableListOf<String>()
+        val overlappingCourses = mutableSetOf<String>()
         
-        for (part in scheduleParts) {
-            val cleanPart = cleanScheduleString(part.trim())
-            val parts = cleanPart.split("/")
-            
-            if (parts.size == 2) {
-                val periodStr = parts[0]
-                val dayStr = parts[1]
+        // First check using time slots for more accurate overlap detection
+        if (timeSlots.isNotEmpty()) {
+            // Check each time slot for overlap with existing courses
+            for (timeSlot in timeSlots) {
+                val day = timeSlot.day
+                val startTime = timeSlot.startTime
+                val endTime = timeSlot.endTime
                 
-                var dayIndex = -1
-                var periodIndex = -1
-                
-                // Convert day string to index
-                dayIndex = when (dayStr) {
+                // Convert day to index
+                val dayIndex = when (day) {
                     "M" -> 0
                     "TU" -> 1
                     "W" -> 2
@@ -818,31 +972,112 @@ class TimetableViewModel : ViewModel() {
                 
                 if (dayIndex == -1) continue
                 
-                // Convert period string to index
-                if (periodStr == "L") {
-                    periodIndex = 3
-                } else {
-                    val periodNum = periodStr.toIntOrNull() ?: continue
-                    // Adjust period index for lunch
-                    if (periodNum < 4) {
-                        periodIndex = periodNum - 1
-                    } else {
-                        periodIndex = periodNum
+                // Check all cells in this day for overlapping courses
+                for (periodIndex in 0 until 9) {
+                    val existingCourse = array[dayIndex][periodIndex]
+                    
+                    // Skip if no course or it's the same course we're checking
+                    if (existingCourse.isEmpty() || existingCourse == courseTitle) {
+                        continue
                     }
-                }
-                
-                if (periodIndex < 0 || periodIndex > 8) continue
-                
-                // Check if there's already a course in this slot
-                val existingCourse = array[dayIndex][periodIndex]
-                if (existingCourse.isNotEmpty() && existingCourse != courseTitle) {
-                    // Found an overlap
-                    overlappingSlots.add("$periodStr/$dayStr")
+                    
+                    // Find the course data to check its time slots
+                    val existingCourseData = coursesData.value.find { it.courseTitle == existingCourse }
+                    
+                    if (existingCourseData != null && existingCourseData.timeSlots.isNotEmpty()) {
+                        // Check if any time slot overlaps with the current time slot
+                        val hasOverlap = existingCourseData.timeSlots.any { existingSlot ->
+                            existingSlot.day == day && 
+                            timeRangesOverlap(startTime, endTime, existingSlot.startTime, existingSlot.endTime)
+                        }
+                        
+                        if (hasOverlap) {
+                            overlappingCourses.add(existingCourse)
+                            // Once we found an overlap, no need to check other periods
+                            // We can't break out of the loop from here, so we'll check other periods
+                        }
+                    }
                 }
             }
         }
         
-        return Pair(overlappingSlots.isNotEmpty(), overlappingSlots.joinToString(", "))
+        // If no overlaps found by time slots, fall back to schedule-based detection
+        if (overlappingCourses.isEmpty() && schedule.isNotEmpty()) {
+            val scheduleParts = schedule.split(",")
+            
+            for (part in scheduleParts) {
+                val cleanPart = cleanScheduleString(part.trim())
+                val parts = cleanPart.split("/")
+                
+                if (parts.size == 2) {
+                    val periodStr = parts[0]
+                    val dayStr = parts[1]
+                    
+                    var dayIndex = -1
+                    
+                    // Convert day string to index
+                    dayIndex = when (dayStr) {
+                        "M" -> 0
+                        "TU" -> 1
+                        "W" -> 2
+                        "TH" -> 3
+                        "F" -> 4
+                        "SA" -> 5
+                        else -> -1
+                    }
+                    
+                    if (dayIndex == -1) continue
+                    
+                    // Convert period string to index for schedule-based overlap
+                    var periodIndex = -1
+                    if (periodStr == "L") {
+                        periodIndex = 3  // Lunch period
+                    } else {
+                        val periodNum = periodStr.toIntOrNull() ?: continue
+                        // Adjust period index for lunch
+                        if (periodNum < 4) {
+                            periodIndex = periodNum - 1
+                        } else {
+                            periodIndex = periodNum
+                        }
+                    }
+                    
+                    if (periodIndex < 0 || periodIndex > 8) continue
+                    
+                    // Check if there's already a course in this slot
+                    val existingCourse = array[dayIndex][periodIndex]
+                    if (existingCourse.isNotEmpty() && existingCourse != courseTitle) {
+                        // Found an overlap - add the entire course
+                        overlappingCourses.add(existingCourse)
+                    }
+                }
+            }
+        }
+        
+        return Pair(overlappingCourses.isNotEmpty(), overlappingCourses.joinToString(", "))
+    }
+    
+    // Parse time slots from schedule, startTime, and endTime
+    private fun parseTimeSlots(schedule: String, startTime: String, endTime: String): List<TimeSlot> {
+        if (schedule.isEmpty()) return emptyList()
+        
+        // If we have explicit start and end times, use them with the schedule
+        if (startTime.isNotEmpty() && endTime.isNotEmpty()) {
+            return schedule.split(",").mapNotNull { part ->
+                val cleanPart = cleanScheduleString(part.trim())
+                val parts = cleanPart.split("/")
+                
+                if (parts.size == 2) {
+                    val day = parts[1]
+                    TimeSlot(day, startTime, endTime)
+                } else {
+                    null
+                }
+            }
+        }
+        
+        // Otherwise derive time slots from the schedule
+        return deriveTimeSlotsFromSchedule(schedule)
     }
     
     // Calculate total credits for all selected courses
@@ -942,5 +1177,420 @@ class TimetableViewModel : ViewModel() {
             sb.append("${course.courseTitle}, ${course.instructor}, ${course.schedule}, ${course.courseno}, ${course.room}, ${course.mode}, ${course.color}, ${course.credits}\n")
         }
         return sb.toString()
+    }
+    
+    // Get the title of a conflicting course from the given slots
+    fun getConflictingCourseTitle(slots: String): String {
+        val slotList = slots.split(", ")
+        if (slotList.isEmpty()) return ""
+        
+        // Get the first slot's indices
+        val (dayIndex, periodIndex) = convertDayToIndices(slotList[0])
+        
+        // Return the course title at those indices
+        return array[dayIndex][periodIndex]
+    }
+    
+    // Convert a day string (e.g., "Mon 1") to day and period indices
+    private fun convertDayToIndices(dayString: String): Pair<Int, Int> {
+        val parts = dayString.split(" ")
+        if (parts.size != 2) return Pair(0, 0)
+        
+        val day = parts[0]
+        val period = parts[1].toIntOrNull() ?: 1
+        
+        val dayIndex = when (day) {
+            "Mon" -> 0
+            "Tue" -> 1
+            "Wed" -> 2
+            "Thu" -> 3
+            "Fri" -> 4
+            else -> 0
+        }
+        
+        return Pair(dayIndex, period - 1)
+    }
+    
+    // Convert time string (HH:MM) to minutes since midnight
+    private fun timeToMinutes(time: String): Int {
+        try {
+            val parts = time.split(":")
+            if (parts.size == 2) {
+                val hours = parts[0].toIntOrNull() ?: 0
+                val minutes = parts[1].toIntOrNull() ?: 0
+                return hours * 60 + minutes
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return 0
+    }
+    
+    // Check if two time ranges overlap
+    private fun timeRangesOverlap(start1: String, end1: String, start2: String, end2: String): Boolean {
+        val start1Mins = timeToMinutes(start1)
+        val end1Mins = timeToMinutes(end1)
+        val start2Mins = timeToMinutes(start2)
+        val end2Mins = timeToMinutes(end2)
+        
+        // Check for overlap
+        return !(end1Mins <= start2Mins || start1Mins >= end2Mins)
+    }
+    
+    // Filter courses for a specific time slot based on time overlap
+    fun filterCoursesForTimeSlot(dayIndex: Int, periodIndex: Int): List<CourseData> {
+        val dayStr = when (dayIndex) {
+            0 -> "M"
+            1 -> "TU"
+            2 -> "W"
+            3 -> "TH"
+            4 -> "F"
+            5 -> "SA"
+            else -> ""
+        }
+        
+        if (dayStr.isEmpty()) return emptyList()
+        
+        // Get the time range for this period
+        val periodNum = periodIndex + 1
+        val periodStr = if (periodIndex == 3) "L" else periodNum.toString()
+        val timeRange = if (periodStr == "L") {
+            lunchTimeDetails["L"]
+        } else {
+            timeDetailWithEighth[periodStr]
+        } ?: Pair("", "")
+        
+        val slotStartTime = timeRange.first
+        val slotEndTime = timeRange.second
+        
+        // Debug output to see what we're looking for
+        println("Filtering courses for day: $dayStr, period: $periodStr, time: $slotStartTime-$slotEndTime")
+        
+        // If we couldn't determine the time range, fall back to schedule-based filtering
+        if (slotStartTime.isEmpty() || slotEndTime.isEmpty()) {
+            return filterCoursesForCell(convertIndicesToDay(dayIndex, periodIndex))
+        }
+        
+        // Filter courses that overlap with this time slot and occur on this day
+        val filteredCourses = coursesData.value.filter { courseData ->
+            // 1. Check if this course occurs on the selected day and has overlapping time
+            val hasOverlappingTimeSlot = courseData.timeSlots.any { timeSlot ->
+                timeSlot.day == dayStr && 
+                timeRangesOverlap(slotStartTime, slotEndTime, timeSlot.startTime, timeSlot.endTime)
+            }
+            
+            if (hasOverlappingTimeSlot) {
+                println("  OVERLAPS! Course: ${courseData.courseTitle}")
+                true
+            } else {
+                // 2. Fall back to schedule-based filtering if no time slots or no overlap found
+                val cellName = convertIndicesToDay(dayIndex, periodIndex)
+                val schedule = courseData.schedule
+                if (schedule.isEmpty()) {
+                    false
+                } else {
+                    val scheduleParts = schedule.split(",")
+                    scheduleParts.any { part ->
+                        val cleanPart = cleanScheduleString(part.trim())
+                        val parts = cleanPart.split("/")
+                        
+                        if (parts.size == 2) {
+                            val periodStrPart = parts[0]
+                            val dayStrPart = parts[1]
+                            
+                            var periodPart = ""
+                            if (cellName.startsWith(dayStrPart)) {
+                                periodPart = cellName.removePrefix(dayStrPart)
+                                periodStrPart == periodPart
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Debug output to see filtered courses
+        println("Found ${filteredCourses.size} courses for day: $dayStr, period: $periodStr")
+        
+        return filteredCourses
+    }
+    
+    // Function to get time details for a specific period
+    fun getTimeDetails(dayIndex: Int, periodIndex: Int): Pair<String, String> {
+        // First check if we have actual time data in the arrays
+        val startTime = arrayStartTime[dayIndex][periodIndex]
+        val endTime = arrayEndTime[dayIndex][periodIndex]
+        
+        // If we have actual time data, use it
+        if (startTime.isNotEmpty() && endTime.isNotEmpty()) {
+            return Pair(startTime, endTime)
+        }
+        
+        // Otherwise, fall back to the default time mapping
+        val periodKey = when (periodIndex) {
+            0 -> "1"
+            1 -> "2"
+            2 -> "3"
+            3 -> "L"  // Lunch period
+            4 -> "4"
+            5 -> "5"
+            6 -> "6"
+            7 -> "7"
+            8 -> "8"
+            else -> ""
+        }
+        
+        return timeDetailWithEighth[periodKey] ?: Pair("", "")
+    }
+    
+    // Update cell with course data (now includes updating time arrays)
+    fun updateCell(dayIndex: Int, periodIndex: Int, courseData: CourseData) {
+        val scheduleParts = courseData.schedule.split(",")
+        
+        // First, find all day/period combinations for this course
+        val courseCells = mutableListOf<Pair<Int, Int>>() // List of (dayIndex, periodIndex) pairs
+        
+        // For each part of the schedule string, find all matching time slots
+        for (part in scheduleParts) {
+            val cleanPart = cleanScheduleString(part.trim())
+            val parts = cleanPart.split("/")
+            
+            if (parts.size == 2) {
+                val periodStr = parts[0]
+                val dayStr = parts[1]
+                
+                // Convert day string to index
+                val currentDayIndex = when (dayStr) {
+                    "M" -> 0
+                    "TU" -> 1
+                    "W" -> 2
+                    "TH" -> 3
+                    "F" -> 4
+                    "SA" -> 5
+                    else -> -1
+                }
+                
+                // Convert period to index
+                val currentPeriodIndex = when (periodStr) {
+                    "1" -> 0
+                    "2" -> 1
+                    "3" -> 2
+                    "L" -> 3
+                    "4" -> 4
+                    "5" -> 5
+                    "6" -> 6
+                    "7" -> 7
+                    "8" -> 8
+                    else -> -1
+                }
+                
+                if (currentDayIndex >= 0 && currentPeriodIndex >= 0) {
+                    courseCells.add(Pair(currentDayIndex, currentPeriodIndex))
+                }
+            }
+        }
+        
+        // Now determine the start and end times for each day
+        val timesByDay = mutableMapOf<Int, Pair<String, String>>() // Map of dayIndex to (startTime, endTime)
+        
+        for (dayIndex in 0..5) {
+            // Get all cells for this day
+            val dayCells = courseCells.filter { it.first == dayIndex }.map { it.second }.sorted()
+            if (dayCells.isEmpty()) continue
+            
+            // Find start and end times for this day by checking time slots
+            var dayStartTime = ""
+            var dayEndTime = ""
+            
+            // First try to find a time slot specific to this day
+            val dayStr = when (dayIndex) {
+                0 -> "M"
+                1 -> "TU"
+                2 -> "W"
+                3 -> "TH"
+                4 -> "F"
+                5 -> "SA"
+                else -> ""
+            }
+            
+            val timeSlot = courseData.timeSlots.find { it.day == dayStr }
+            if (timeSlot != null) {
+                dayStartTime = timeSlot.startTime
+                dayEndTime = timeSlot.endTime
+            } else {
+                // If no day-specific time slot, use the general start/end times
+                dayStartTime = courseData.startTime
+                dayEndTime = courseData.endTime
+            }
+            
+            // Store for later use
+            if (dayStartTime.isNotEmpty() && dayEndTime.isNotEmpty()) {
+                timesByDay[dayIndex] = Pair(dayStartTime, dayEndTime)
+            }
+        }
+        
+        // Now update all cells for this course
+        for ((cellDayIndex, cellPeriodIndex) in courseCells) {
+            // Update cell data
+            array[cellDayIndex][cellPeriodIndex] = courseData.courseTitle
+            arrayInstructor[cellDayIndex][cellPeriodIndex] = courseData.instructor
+            arraySchedule[cellDayIndex][cellPeriodIndex] = courseData.schedule
+            arrayCourseno[cellDayIndex][cellPeriodIndex] = courseData.courseno
+            arrayRoom[cellDayIndex][cellPeriodIndex] = courseData.room
+            arrayMode[cellDayIndex][cellPeriodIndex] = courseData.mode
+            arrayColor[cellDayIndex][cellPeriodIndex] = courseData.color
+            
+            // Get time for this day
+            val (startTime, endTime) = timesByDay[cellDayIndex] ?: Pair("", "")
+            if (startTime.isNotEmpty() && endTime.isNotEmpty()) {
+                arrayStartTime[cellDayIndex][cellPeriodIndex] = startTime
+                arrayEndTime[cellDayIndex][cellPeriodIndex] = endTime
+            }
+        }
+        
+        // Save changes to the current timetable
+        saveCurrentTimetableData()
+        
+        // Recalculate total credits
+        calculateTotalCredits()
+    }
+    
+    // Load data from CSV file
+    fun loadCoursesFromCSV(year: String, term: String, csvData: String) {
+        val coursesList = mutableListOf<CourseData>()
+        
+        // Debug flag for Japanese courses
+        val debugJapanese = true
+        
+        // Skip header line and parse CSV data
+        csvData.trim().lines().drop(1).forEach { line ->
+            try {
+                val fields = line.split(";")
+                if (fields.size >= 11) {  // Make sure we have at least 11 fields including schedule_time
+                    // Normalize year and term to handle potential whitespace or formatting issues
+                    val csvYear = fields[7].trim()
+                    val csvTerm = fields[8].trim()
+                    
+                    if (csvYear == year && csvTerm.equals(term, ignoreCase = true)) {
+                        var lang = ""
+                        if (fields.size > 6 && fields[6] != "NO DATA") {
+                            lang = "(${fields[6]})"
+                        }
+                        
+                        val title = fields[0].trim()
+                        val instructor = fields[1].trim()
+                        val schedule = fields[2].trim()
+                        val courseno = fields[3].trim()
+                        val room = fields[4].trim()
+                        val mode = fields[5].trim()
+                        val credits = fields[9].trim().toIntOrNull() ?: 0
+                        
+                        // Debug Japanese courses
+                        val isJapaneseCourse = title.startsWith("日本語")
+                        if (isJapaneseCourse && debugJapanese) {
+                            println("Found Japanese course: $title")
+                            println("Schedule: $schedule")
+                        }
+                        
+                        // Process schedule_time field (could have multiple time slots)
+                        val scheduleTime = fields[10].trim().replace("\"", "")
+                        
+                        // Try to parse schedule_time using both formats
+                        var timeSlots = if (scheduleTime.contains("/")) {
+                            // This is likely the new ICS-like format
+                            parseICSLikeScheduleTime(scheduleTime)
+                        } else if (scheduleTime != "NO DATA" && scheduleTime.isNotEmpty()) {
+                            // This is likely the traditional format with day names
+                            parseScheduleTimeField(scheduleTime)
+                        } else {
+                            // If no time data, use default based on schedule
+                            deriveTimeSlotsFromSchedule(schedule)
+                        }
+                        
+                        // Special handling for Japanese courses to ensure correct time slots
+                        if (isJapaneseCourse) {
+                            // Ensure we have the correct time slots for Japanese courses
+                            val fixedTimeSlots = mutableListOf<TimeSlot>()
+                            
+                            // Check if this is J1-J4 course that follows special pattern
+                            if (title.matches(Regex("日本語J[1-4].*"))) {
+                                // These courses follow a specific pattern:
+                                // Monday-Wednesday: 8:45-11:25
+                                // Friday: 8:45-12:50
+                                
+                                // First add Monday-Wednesday slots
+                                fixedTimeSlots.add(TimeSlot("M", "08:45", "11:25"))
+                                fixedTimeSlots.add(TimeSlot("TU", "08:45", "11:25"))
+                                fixedTimeSlots.add(TimeSlot("W", "08:45", "11:25"))
+                                
+                                // Add Friday with longer time
+                                fixedTimeSlots.add(TimeSlot("F", "08:45", "12:50"))
+                                
+                                timeSlots = fixedTimeSlots
+                                
+                                if (debugJapanese) {
+                                    println("Applied fixed time slots for Japanese course:")
+                                    timeSlots.forEach { 
+                                        println("  ${it.day}: ${it.startTime}-${it.endTime}") 
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // If no schedule info and no time slots, skip this course
+                        val skipCourse = schedule == "NO DATA" && timeSlots.isEmpty()
+                        if (!skipCourse) {
+                            // If we have time slots but no schedule, generate a schedule
+                            val finalSchedule = if (schedule == "NO DATA" && timeSlots.isNotEmpty()) {
+                                generateScheduleFromTimeSlots(timeSlots)
+                            } else {
+                                schedule
+                            }
+                            
+                            // Get start and end times from the first time slot, if available
+                            val startTime = if (timeSlots.isNotEmpty()) timeSlots[0].startTime else ""
+                            val endTime = if (timeSlots.isNotEmpty()) timeSlots[0].endTime else ""
+                            
+                            // Create a course entry
+                            val courseData = CourseData(
+                                courseTitle = title + if (lang.isNotEmpty()) " $lang" else "",
+                                instructor = instructor,
+                                schedule = finalSchedule,
+                                courseno = courseno,
+                                room = room,
+                                mode = mode,
+                                color = "white",
+                                credits = credits,
+                                startTime = startTime,
+                                endTime = endTime,
+                                timeSlots = timeSlots
+                            )
+                            coursesList.add(courseData)
+                            
+                            // Debug output for the first few courses
+                            if (coursesList.size <= 5 || isJapaneseCourse) {
+                                println("Added course: $title, schedule: $finalSchedule, time slots: ${timeSlots.size}")
+                                timeSlots.forEach { slot ->
+                                    println("  - ${slot.day} ${slot.startTime}-${slot.endTime}")
+                                }
+                                println("  Start time: $startTime, End time: $endTime")
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Skip malformed entries
+                e.printStackTrace()
+                println("Error parsing line: $line")
+                println("Exception: ${e.message}")
+            }
+        }
+        
+        _coursesData.update { coursesList }
+        println("Loaded ${coursesList.size} courses for $year $term")
     }
 } 
